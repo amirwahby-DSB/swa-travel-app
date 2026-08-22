@@ -1,0 +1,22 @@
+workflows:
+  web-workflow:
+    name: Web Workflow
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      groups:
+        - firebase
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Generate web project files
+        script: flutter create . --platforms=web
+      - name: Build web
+        script: flutter build web --release --no-tree-shake-icons
+      - name: Install Firebase CLI
+        script: npm install -g firebase-tools || true
+      - name: Deploy to Firebase Hosting
+        script: |
+          echo $FIREBASE_SERVICE_ACCOUNT > $CM_BUILD_DIR/firebase-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=$CM_BUILD_DIR/firebase-key.json
+          firebase deploy --only hosting --project swa-travel-app --non-interactive
