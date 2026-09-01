@@ -15,8 +15,8 @@ class HomeStrings {
 
   static String get heroSubtitle => switch (current) {
         AppLanguage.ar => 'تذاكر، ليموزين، رحلات، وأماكن مؤتمرات — قارن واطلب في دقايق',
-        AppLanguage.en => 'Flights, limousines, trips, and conference venues — compare and book in minutes',
-        AppLanguage.de => 'Flüge, Limousinen, Ausflüge und Konferenzräume — vergleichen und in Minuten buchen',
+        AppLanguage.en => 'Flights, limousines, trips & venues — compare and book fast',
+        AppLanguage.de => 'Flüge, Limousinen, Ausflüge & Locations — schnell buchen',
       };
 
   static String get featuredOffersTitle => switch (current) {
@@ -65,16 +65,16 @@ class HomeStrings {
         AppLanguage.de => 'Ab 450 EGP',
       };
 
-  // Offer 3
+  // Offer 3 (renamed: general halls/venues, not just Bibliotheca Alexandrina)
   static String get offer3Title => switch (current) {
-        AppLanguage.ar => 'قاعة مكتبة الإسكندرية',
-        AppLanguage.en => 'Bibliotheca Alexandrina Hall',
-        AppLanguage.de => 'Halle der Bibliotheca Alexandrina',
+        AppLanguage.ar => 'قاعات ومساحات مميزة',
+        AppLanguage.en => 'Premium Halls & Venues',
+        AppLanguage.de => 'Premium-Säle & Veranstaltungsorte',
       };
   static String get offer3Sub => switch (current) {
-        AppLanguage.ar => 'مؤتمرات وفعاليات كبرى',
-        AppLanguage.en => 'Conferences and major events',
-        AppLanguage.de => 'Konferenzen und Großveranstaltungen',
+        AppLanguage.ar => 'قاعات فعاليات ومؤتمرات في الإسكندرية',
+        AppLanguage.en => 'Event and conference venues in Alexandria',
+        AppLanguage.de => 'Veranstaltungs- und Konferenzorte in Alexandria',
       };
   static String get offer3Price => switch (current) {
         AppLanguage.ar => 'اطلب عرض سعر',
@@ -99,9 +99,9 @@ class HomeStrings {
         AppLanguage.de => 'Ausflüge',
       };
   static String get catConference => switch (current) {
-        AppLanguage.ar => 'قاعات مؤتمرات',
-        AppLanguage.en => 'Conference halls',
-        AppLanguage.de => 'Konferenzräume',
+        AppLanguage.ar => 'قاعات ومساحات للإيجار',
+        AppLanguage.en => 'Halls & Venues for Rent',
+        AppLanguage.de => 'Säle & Veranstaltungsorte zur Miete',
       };
   static String companiesCount(int n) => switch (current) {
         AppLanguage.ar => '$n شركات',
