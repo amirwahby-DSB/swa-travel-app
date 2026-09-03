@@ -108,4 +108,66 @@ class HomeStrings {
         AppLanguage.en => '$n companies',
         AppLanguage.de => '$n Unternehmen',
       };
+
+  // ---------- Company inquiry ("Submit your offer as a company") ----------
+  static String get joinAsCompanyButton => switch (current) {
+        AppLanguage.ar => 'قدّم عرضك كشركة',
+        AppLanguage.en => 'Submit your offer as a company',
+        AppLanguage.de => 'Als Unternehmen bewerben',
+      };
+  static String get joinFormTitle => switch (current) {
+        AppLanguage.ar => 'انضم كشريك',
+        AppLanguage.en => 'Become a partner',
+        AppLanguage.de => 'Partner werden',
+      };
+  static String get joinFormSubtitle => switch (current) {
+        AppLanguage.ar => 'اعرض خدماتك على آلاف المسافرين',
+        AppLanguage.en => 'Showcase your services to thousands of travelers',
+        AppLanguage.de => 'Präsentieren Sie Ihre Dienstleistungen',
+      };
+  static String get companyNameLabel => switch (current) {
+        AppLanguage.ar => 'اسم الشركة',
+        AppLanguage.en => 'Company name',
+        AppLanguage.de => 'Firmenname',
+      };
+  static String get serviceTypeLabel => switch (current) {
+        AppLanguage.ar => 'نوع الخدمة',
+        AppLanguage.en => 'Service type',
+        AppLanguage.de => 'Dienstleistungsart',
+      };
+  static String get catOther => switch (current) {
+        AppLanguage.ar => 'أخرى',
+        AppLanguage.en => 'Other',
+        AppLanguage.de => 'Sonstiges',
+      };
+  static String get contactInfoLabel => switch (current) {
+        AppLanguage.ar => 'بيانات التواصل (رقم/إيميل)',
+        AppLanguage.en => 'Contact info (phone/email)',
+        AppLanguage.de => 'Kontaktdaten (Telefon/E-Mail)',
+      };
+  static String get offerDescriptionLabel => switch (current) {
+        AppLanguage.ar => 'وصف العرض',
+        AppLanguage.en => 'Offer description',
+        AppLanguage.de => 'Angebotsbeschreibung',
+      };
+  static String get requiredFieldError => switch (current) {
+        AppLanguage.ar => 'مطلوب',
+        AppLanguage.en => 'Required',
+        AppLanguage.de => 'Erforderlich',
+      };
+  static String get submitButton => switch (current) {
+        AppLanguage.ar => 'إرسال الطلب',
+        AppLanguage.en => 'Submit request',
+        AppLanguage.de => 'Anfrage senden',
+      };
+  static String get cancelButton => switch (current) {
+        AppLanguage.ar => 'إلغاء',
+        AppLanguage.en => 'Cancel',
+        AppLanguage.de => 'Abbrechen',
+      };
+  static String get joinMessageIntro => switch (current) {
+        AppLanguage.ar => 'طلب انضمام شركة جديدة - SWA Travel',
+        AppLanguage.en => 'New company partnership request - SWA Travel',
+        AppLanguage.de => 'Neue Partnerschaftsanfrage - SWA Travel',
+      };
 }

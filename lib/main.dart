@@ -1,3 +1,4 @@
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_strings.dart';
@@ -105,6 +106,17 @@ class HomeScreen extends StatelessWidget {
     return GoogleFonts.amiri(fontSize: size, color: color, fontWeight: weight, height: height);
   }
 
+  // ---------- WhatsApp quick-contact ----------
+  static const String _whatsappNumber = '201223275747';
+
+  Future<void> _openWhatsApp(String offerTitle) async {
+    final message = HomeStrings.isRtl
+        ? 'أهلاً، أنا مهتم بـ: $offerTitle - SWA Travel'
+        : 'Hi, I\'m interested in: $offerTitle - SWA Travel';
+    final uri = Uri.parse('https://wa.me/$_whatsappNumber?text=${Uri.encodeComponent(message)}');
+    html.window.open(uri.toString(), '_blank');
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -163,6 +175,7 @@ class HomeScreen extends StatelessWidget {
                         _buildHero(),
                         _buildFeaturedOffers(),
                         _buildCategories(),
+                        _buildJoinCompanySection(context),
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -413,7 +426,36 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => _openWhatsApp(o['title'] as String),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF25D366).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF25D366).withOpacity(0.5), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  HomeStrings.isRtl ? 'واتساب' : 'WhatsApp',
+                                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF25D366)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -489,6 +531,220 @@ class HomeScreen extends StatelessWidget {
         Container(width: 18, height: 1.4, color: SwaColors.gold),
         const SizedBox(width: 8),
         Text(text, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: SwaColors.textDark, letterSpacing: 0.2)),
+      ],
+    );
+  }
+
+  // ---------- "Submit your offer as a company" entry point ----------
+  Widget _buildJoinCompanySection(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => showDialog(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.55),
+          builder: (_) => const _CompanyInquiryDialog(),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1.2),
+            gradient: LinearGradient(colors: [SwaColors.gold.withOpacity(0.08), SwaColors.gold.withOpacity(0.02)]),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.storefront_outlined, size: 17, color: SwaColors.gold),
+              const SizedBox(width: 8),
+              Text(
+                HomeStrings.joinAsCompanyButton,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Company inquiry form dialog ----------
+class _CompanyInquiryDialog extends StatefulWidget {
+  const _CompanyInquiryDialog();
+
+  @override
+  State<_CompanyInquiryDialog> createState() => _CompanyInquiryDialogState();
+}
+
+class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
+  static const String _whatsappNumber = '201223275747';
+  static const String _companyEmail = 'egyptswawork@gmail.com';
+
+  final _formKey = GlobalKey<FormState>();
+  final _companyNameCtrl = TextEditingController();
+  final _contactInfoCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  late String _serviceType;
+
+  @override
+  void initState() {
+    super.initState();
+    _serviceType = HomeStrings.catFlights;
+  }
+
+  @override
+  void dispose() {
+    _companyNameCtrl.dispose();
+    _contactInfoCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  String _buildMessage() {
+    final buffer = StringBuffer()
+      ..writeln(HomeStrings.joinMessageIntro)
+      ..writeln()
+      ..writeln('${HomeStrings.companyNameLabel}: ${_companyNameCtrl.text}')
+      ..writeln('${HomeStrings.serviceTypeLabel}: $_serviceType')
+      ..writeln('${HomeStrings.contactInfoLabel}: ${_contactInfoCtrl.text}')
+      ..writeln('${HomeStrings.offerDescriptionLabel}: ${_descriptionCtrl.text}');
+    return buffer.toString();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    final message = _buildMessage();
+
+    final whatsappUri = Uri.parse('https://wa.me/$_whatsappNumber?text=${Uri.encodeComponent(message)}');
+    final emailUri = Uri(
+      scheme: 'mailto',
+      path: _companyEmail,
+      query: 'subject=${Uri.encodeComponent(HomeStrings.joinMessageIntro)}&body=${Uri.encodeComponent(message)}',
+    );
+
+    // Opened synchronously (no await in between) so both windows are
+    // still treated as user-initiated by the browser's popup blocker.
+    html.window.open(emailUri.toString(), '_blank');
+    html.window.open(whatsappUri.toString(), '_blank');
+
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = [
+      HomeStrings.catFlights,
+      HomeStrings.catLimo,
+      HomeStrings.catTrips,
+      HomeStrings.catConference,
+      HomeStrings.catOther,
+    ];
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: SwaColors.ivory,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.3), width: 1),
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    HomeStrings.joinFormTitle,
+                    style: HomeScreen._display(size: 19, color: SwaColors.textDark, weight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    HomeStrings.joinFormSubtitle,
+                    style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted),
+                  ),
+                  const SizedBox(height: 18),
+                  _field(controller: _companyNameCtrl, label: HomeStrings.companyNameLabel),
+                  const SizedBox(height: 12),
+                  Text(HomeStrings.serviceTypeLabel, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: SwaColors.textMuted)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: _serviceType,
+                    isExpanded: true,
+                    decoration: _inputDecoration(),
+                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+                    onChanged: (v) => setState(() => _serviceType = v ?? _serviceType),
+                  ),
+                  const SizedBox(height: 12),
+                  _field(controller: _contactInfoCtrl, label: HomeStrings.contactInfoLabel),
+                  const SizedBox(height: 12),
+                  _field(controller: _descriptionCtrl, label: HomeStrings.offerDescriptionLabel, maxLines: 3),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text(HomeStrings.cancelButton, style: const TextStyle(color: SwaColors.textMuted, fontSize: 13)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: SwaColors.ink,
+                            foregroundColor: SwaColors.goldLight,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text(HomeStrings.submitButton, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration() {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: SwaColors.ivoryLine)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: SwaColors.gold, width: 1.4)),
+    );
+  }
+
+  Widget _field({required TextEditingController controller, required String label, int maxLines = 1}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: SwaColors.textMuted)),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          style: const TextStyle(fontSize: 13),
+          decoration: _inputDecoration(),
+          validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
+        ),
       ],
     );
   }
