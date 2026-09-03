@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'home_strings.dart';
 
 // ---------- Brand palette (VIP travel: deep ink navy + champagne gold) ----------
@@ -121,7 +123,8 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 700;
-    final maxWidth = isDesktop ? _referenceWidth : double.infinity;
+    final isWide = screenWidth >= 1000;
+    final maxWidth = isWide ? 860.0 : (isDesktop ? _referenceWidth : double.infinity);
 
     return Scaffold(
       body: Stack(
@@ -173,8 +176,9 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         _buildHeader(),
                         _buildHero(),
-                        _buildFeaturedOffers(),
+                        _buildFeaturedOffers(isWide),
                         _buildCategories(),
+                        _CurrencyRatesSection(),
                         _buildJoinCompanySection(context),
                         const SizedBox(height: 32),
                       ],
@@ -184,7 +188,44 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
+          // fixed SOS button — always visible regardless of scroll position
+          Positioned(
+            bottom: 22,
+            right: HomeStrings.isRtl ? null : 22,
+            left: HomeStrings.isRtl ? 22 : null,
+            child: _buildEmergencyButton(context),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmergencyButton(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(30),
+      onTap: () => showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.55),
+        builder: (_) => const _EmergencyNumbersDialog(),
+      ),
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(colors: [SwaColors.ink, Color(0xFF14283A)]),
+          border: Border.all(color: SwaColors.gold.withOpacity(0.7), width: 1.4),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6)),
+            BoxShadow(color: SwaColors.gold.withOpacity(0.2), blurRadius: 10, spreadRadius: 1),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.sos, color: SwaColors.goldLight, size: 22),
+          ],
+        ),
       ),
     );
   }
@@ -273,15 +314,17 @@ class HomeScreen extends StatelessWidget {
               child: CustomPaint(painter: _PatternPainter(SwaColors.gold.withOpacity(0.10))),
             ),
           ),
-          Column(
-            children: [
-              SizedBox(
-                width: 88,
-                height: 88,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
                     // outer glow ring — same badge frame as before
                     Container(
                       width: 74,
@@ -349,7 +392,8 @@ class HomeScreen extends StatelessWidget {
                   gradient: LinearGradient(colors: [Colors.transparent, SwaColors.gold, Colors.transparent]),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -357,9 +401,10 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ---------- Featured Offers: dark cards, thin gold rule, outline icon ----------
-  Widget _buildFeaturedOffers() {
+  Widget _buildFeaturedOffers(bool isWide) {
     final offers = [
       {'title': HomeStrings.offer1Title, 'sub': HomeStrings.offer1Sub, 'price': HomeStrings.offer1Price, 'icon': Icons.flight_outlined, 'featured': true, 'rating': 4.8},
+      {'title': HomeStrings.offer4Title, 'sub': HomeStrings.offer4Sub, 'price': HomeStrings.offer4Price, 'icon': Icons.hotel_outlined, 'featured': false, 'rating': 4.7},
       {'title': HomeStrings.offer2Title, 'sub': HomeStrings.offer2Sub, 'price': HomeStrings.offer2Price, 'icon': Icons.directions_car_outlined, 'featured': false, 'rating': 4.6},
       {'title': HomeStrings.offer3Title, 'sub': HomeStrings.offer3Sub, 'price': HomeStrings.offer3Price, 'icon': Icons.apartment_outlined, 'featured': false, 'rating': 4.9},
     ];
@@ -371,96 +416,104 @@ class HomeScreen extends StatelessWidget {
         children: [
           _sectionLabel(HomeStrings.featuredOffersTitle),
           const SizedBox(height: 16),
-          ...offers.map((o) {
-            final featured = o['featured'] as bool;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [SwaColors.ink, Color(0xFF132938)],
+          if (isWide)
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: offers.map((o) => SizedBox(width: 340, child: _offerCard(o))).toList(),
+            )
+          else
+            Column(
+              children: offers.map((o) => Padding(padding: const EdgeInsets.only(bottom: 14), child: _offerCard(o))).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _offerCard(Map<String, Object> o) {
+    final featured = o['featured'] as bool;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [SwaColors.ink, Color(0xFF132938)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: featured ? SwaColors.gold.withOpacity(0.55) : SwaColors.inkLine, width: featured ? 1.2 : 1),
+        boxShadow: featured
+            ? [BoxShadow(color: SwaColors.gold.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 8))]
+            : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(o['icon'] as IconData, color: SwaColors.gold, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (featured)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'FEATURED',
+                      style: const TextStyle(fontSize: 9, color: SwaColors.gold, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: featured ? SwaColors.gold.withOpacity(0.55) : SwaColors.inkLine, width: featured ? 1.2 : 1),
-                  boxShadow: featured
-                      ? [BoxShadow(color: SwaColors.gold.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 8))]
-                      : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
+                Text(o['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text(o['sub'] as String, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
+                const SizedBox(height: 6),
+                Row(
                   children: [
-                    Container(
-                      width: 46, height: 46,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(o['icon'] as IconData, color: SwaColors.gold, size: 20),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (featured)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(
-                                'FEATURED',
-                                style: const TextStyle(fontSize: 9, color: SwaColors.gold, fontWeight: FontWeight.w700, letterSpacing: 0.6),
-                              ),
-                            ),
-                          Text(o['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white)),
-                          const SizedBox(height: 2),
-                          Text(o['sub'] as String, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(Icons.star, size: 12, color: SwaColors.gold.withOpacity(0.9)),
-                              const SizedBox(width: 3),
-                              Text('${o['rating']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.75))),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
-                        const SizedBox(height: 8),
-                        InkWell(
-                          onTap: () => _openWhatsApp(o['title'] as String),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF25D366).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF25D366).withOpacity(0.5), width: 1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  HomeStrings.isRtl ? 'واتساب' : 'WhatsApp',
-                                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF25D366)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    Icon(Icons.star, size: 12, color: SwaColors.gold.withOpacity(0.9)),
+                    const SizedBox(width: 3),
+                    Text('${o['rating']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.75))),
                   ],
                 ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => _openWhatsApp(o['title'] as String),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25D366).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF25D366).withOpacity(0.5), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
+                      const SizedBox(width: 4),
+                      Text(
+                        HomeStrings.isRtl ? 'واتساب' : 'WhatsApp',
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF25D366)),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            );
-          }),
+            ],
+          ),
         ],
       ),
     );
@@ -470,6 +523,7 @@ class HomeScreen extends StatelessWidget {
   Widget _buildCategories() {
     final categories = [
       {'label': HomeStrings.catTrips, 'count': HomeStrings.companiesCount(9), 'icon': Icons.map_outlined},
+      {'label': HomeStrings.catHotels, 'count': HomeStrings.companiesCount(7), 'icon': Icons.hotel_outlined},
       {'label': HomeStrings.catFlights, 'count': HomeStrings.companiesCount(6), 'icon': Icons.confirmation_number_outlined},
       {'label': HomeStrings.catLimo, 'count': HomeStrings.companiesCount(4), 'icon': Icons.directions_car_outlined},
       {'label': HomeStrings.catConference, 'count': HomeStrings.companiesCount(3), 'icon': Icons.apartment_outlined},
@@ -636,6 +690,7 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
   Widget build(BuildContext context) {
     final categories = [
       HomeStrings.catFlights,
+      HomeStrings.catHotels,
       HomeStrings.catLimo,
       HomeStrings.catTrips,
       HomeStrings.catConference,
@@ -746,6 +801,232 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
           validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
         ),
       ],
+    );
+  }
+}
+
+// ---------- Live currency rates (USD/EUR -> EGP) ----------
+class _CurrencyRatesSection extends StatefulWidget {
+  const _CurrencyRatesSection();
+
+  @override
+  State<_CurrencyRatesSection> createState() => _CurrencyRatesSectionState();
+}
+
+class _CurrencyRatesSectionState extends State<_CurrencyRatesSection> {
+  bool _loading = true;
+  bool _error = false;
+  double? _usdToEgp;
+  double? _eurToEgp;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRates();
+  }
+
+  Future<void> _fetchRates() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final response = await http
+          .get(Uri.parse('https://open.er-api.com/v6/latest/USD'))
+          .timeout(const Duration(seconds: 8));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final rates = data['rates'] as Map<String, dynamic>;
+      final usdToEgp = (rates['EGP'] as num).toDouble();
+      final usdToEur = (rates['EUR'] as num).toDouble();
+      setState(() {
+        _usdToEgp = usdToEgp;
+        _eurToEgp = usdToEgp / usdToEur;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(width: 18, height: 1.4, color: SwaColors.gold),
+              const SizedBox(width: 8),
+              Text(HomeStrings.currencyTitle, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: SwaColors.textDark, letterSpacing: 0.2)),
+              const Spacer(),
+              InkWell(
+                onTap: _loading ? null : _fetchRates,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.refresh_rounded, size: 16, color: SwaColors.gold.withOpacity(0.8)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: SwaColors.ivoryLine, width: 1),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: _loading
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.gold),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(HomeStrings.currencyLoading, style: const TextStyle(fontSize: 12, color: SwaColors.textMuted)),
+                    ],
+                  )
+                : _error
+                    ? Text(HomeStrings.currencyError, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: SwaColors.textMuted))
+                    : Column(
+                        children: [
+                          _rateRow('USD', _usdToEgp!),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Divider(height: 1, color: SwaColors.ivoryLine),
+                          ),
+                          _rateRow('EUR', _eurToEgp!),
+                          const SizedBox(height: 8),
+                          Text(
+                            HomeStrings.currencyPerEgp,
+                            style: TextStyle(fontSize: 10, color: SwaColors.textMuted.withOpacity(0.8)),
+                          ),
+                        ],
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rateRow(String code, double value) {
+    return Row(
+      children: [
+        Container(
+          width: 34, height: 34,
+          decoration: BoxDecoration(
+            border: Border.all(color: SwaColors.gold.withOpacity(0.4), width: 1),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(code, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: SwaColors.gold)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text('1 $code', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark)),
+        ),
+        Text('${value.toStringAsFixed(2)} EGP', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: SwaColors.textDark)),
+      ],
+    );
+  }
+}
+
+// ---------- Emergency numbers dialog ----------
+class _EmergencyNumbersDialog extends StatelessWidget {
+  const _EmergencyNumbersDialog();
+
+  static const _numbers = [
+    {'labelGetter': 'police', 'number': '122', 'icon': Icons.local_police_outlined},
+    {'labelGetter': 'ambulance', 'number': '123', 'icon': Icons.medical_services_outlined},
+    {'labelGetter': 'fire', 'number': '180', 'icon': Icons.local_fire_department_outlined},
+    {'labelGetter': 'touristPolice', 'number': '126', 'icon': Icons.shield_outlined},
+    {'labelGetter': 'trafficPolice', 'number': '128', 'icon': Icons.traffic_outlined},
+  ];
+
+  String _labelFor(String key) {
+    switch (key) {
+      case 'police':
+        return HomeStrings.emergencyPolice;
+      case 'ambulance':
+        return HomeStrings.emergencyAmbulance;
+      case 'fire':
+        return HomeStrings.emergencyFire;
+      case 'touristPolice':
+        return HomeStrings.emergencyTouristPolice;
+      default:
+        return HomeStrings.emergencyTrafficPolice;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [SwaColors.inkDeep, SwaColors.ink]),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.4), width: 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.sos, color: SwaColors.gold, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    HomeStrings.emergencyTitle,
+                    style: HomeScreen._display(size: 17, color: Colors.white, weight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.close, color: Colors.white54, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ..._numbers.map((n) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(n['icon'] as IconData, color: SwaColors.goldLight, size: 18),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(_labelFor(n['labelGetter'] as String), style: const TextStyle(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600)),
+                        ),
+                        Text(n['number'] as String, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: SwaColors.gold)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

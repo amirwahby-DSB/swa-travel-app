@@ -82,6 +82,23 @@ class HomeStrings {
         AppLanguage.de => 'Angebot anfordern',
       };
 
+  // Offer 4 (hotels)
+  static String get offer4Title => switch (current) {
+        AppLanguage.ar => 'فنادق الإسكندرية المميزة',
+        AppLanguage.en => 'Alexandria Premium Hotels',
+        AppLanguage.de => 'Premium-Hotels in Alexandria',
+      };
+  static String get offer4Sub => switch (current) {
+        AppLanguage.ar => 'غرف 3 و4 و5 نجوم على الكورنيش',
+        AppLanguage.en => '3, 4 & 5-star rooms on the Corniche',
+        AppLanguage.de => '3-, 4- und 5-Sterne-Zimmer an der Corniche',
+      };
+  static String get offer4Price => switch (current) {
+        AppLanguage.ar => 'يبدأ من 1,800 ج.م',
+        AppLanguage.en => 'From EGP 1,800',
+        AppLanguage.de => 'Ab 1.800 EGP',
+      };
+
   // Categories
   static String get catFlights => switch (current) {
         AppLanguage.ar => 'تذاكر طيران',
@@ -97,6 +114,11 @@ class HomeStrings {
         AppLanguage.ar => 'رحلات',
         AppLanguage.en => 'Trips',
         AppLanguage.de => 'Ausflüge',
+      };
+  static String get catHotels => switch (current) {
+        AppLanguage.ar => 'حجز فنادق',
+        AppLanguage.en => 'Hotel Booking',
+        AppLanguage.de => 'Hotelbuchung',
       };
   static String get catConference => switch (current) {
         AppLanguage.ar => 'قاعات ومساحات للإيجار',
@@ -169,5 +191,59 @@ class HomeStrings {
         AppLanguage.ar => 'طلب انضمام شركة جديدة - SWA Travel',
         AppLanguage.en => 'New company partnership request - SWA Travel',
         AppLanguage.de => 'Neue Partnerschaftsanfrage - SWA Travel',
+      };
+
+  // ---------- Emergency numbers ----------
+  static String get emergencyTitle => switch (current) {
+        AppLanguage.ar => 'أرقام الطوارئ',
+        AppLanguage.en => 'Emergency Numbers',
+        AppLanguage.de => 'Notrufnummern',
+      };
+  static String get emergencyPolice => switch (current) {
+        AppLanguage.ar => 'الشرطة',
+        AppLanguage.en => 'Police',
+        AppLanguage.de => 'Polizei',
+      };
+  static String get emergencyAmbulance => switch (current) {
+        AppLanguage.ar => 'الإسعاف',
+        AppLanguage.en => 'Ambulance',
+        AppLanguage.de => 'Krankenwagen',
+      };
+  static String get emergencyFire => switch (current) {
+        AppLanguage.ar => 'المطافئ',
+        AppLanguage.en => 'Fire Department',
+        AppLanguage.de => 'Feuerwehr',
+      };
+  static String get emergencyTouristPolice => switch (current) {
+        AppLanguage.ar => 'شرطة السياحة والآثار',
+        AppLanguage.en => 'Tourist & Antiquities Police',
+        AppLanguage.de => 'Tourismus- und Altertümerpolizei',
+      };
+  static String get emergencyTrafficPolice => switch (current) {
+        AppLanguage.ar => 'المرور',
+        AppLanguage.en => 'Traffic Police',
+        AppLanguage.de => 'Verkehrspolizei',
+      };
+
+  // ---------- Currency rates ----------
+  static String get currencyTitle => switch (current) {
+        AppLanguage.ar => 'أسعار العملات',
+        AppLanguage.en => 'Exchange Rates',
+        AppLanguage.de => 'Wechselkurse',
+      };
+  static String get currencyLoading => switch (current) {
+        AppLanguage.ar => 'جاري التحديث...',
+        AppLanguage.en => 'Updating...',
+        AppLanguage.de => 'Wird aktualisiert...',
+      };
+  static String get currencyError => switch (current) {
+        AppLanguage.ar => 'تعذّر تحميل السعر الحالي',
+        AppLanguage.en => 'Could not load live rates',
+        AppLanguage.de => 'Kurse konnten nicht geladen werden',
+      };
+  static String get currencyPerEgp => switch (current) {
+        AppLanguage.ar => 'مقابل الجنيه المصري',
+        AppLanguage.en => 'against the Egyptian Pound',
+        AppLanguage.de => 'gegenüber dem ägyptischen Pfund',
       };
 }
