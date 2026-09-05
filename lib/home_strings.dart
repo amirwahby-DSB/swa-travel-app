@@ -288,4 +288,39 @@ class HomeStrings {
         AppLanguage.en => 'Welcome',
         AppLanguage.de => 'Willkommen',
       };
+
+  // ---------- Company welcome / package confirmation ----------
+  static String get companyWelcomeTitle => switch (current) {
+        AppLanguage.ar => 'أهلاً بيك في SWA Travel! 🎉',
+        AppLanguage.en => 'Welcome to SWA Travel! 🎉',
+        AppLanguage.de => 'Willkommen bei SWA Travel! 🎉',
+      };
+  static String get companyWelcomeBody => switch (current) {
+        AppLanguage.ar =>
+          'انضمامك معانا فعلاً قيمة مضافة لمنصة سوا، وهنساعدك نسوّق لعروضك وبرامجك بشكل احترافي كل شهر أمام آلاف المسافرين.\n\n'
+              'تفاصيل الباقة:\n'
+              '• أول 15 يوم: عرض إعلانك مجانًا بالكامل.\n'
+              '• بعد كده: اشتراك شهري 350 جنيه مصري، يُدفع مقدمًا في بداية كل شهر.\n'
+              '• في حالة تأخر السداد: يتوقف عرض إعلانك مؤقتًا، مع الاحتفاظ ببياناتك بالكامل لحد ما تحب تفعّله تاني.\n\n'
+              'هنتواصل معاك قريبًا لتأكيد التفاصيل.',
+        AppLanguage.en =>
+          'Your partnership adds real value to our platform, and we\'ll help market your offers professionally to thousands of travelers every month.\n\n'
+              'Package details:\n'
+              '• First 15 days: your listing is featured completely free.\n'
+              '• After that: a monthly subscription of EGP 350, paid in advance at the start of each month.\n'
+              '• If payment is delayed: your listing is paused temporarily, but your data stays saved until you\'re ready to reactivate.\n\n'
+              'We\'ll be in touch soon to confirm the details.',
+        AppLanguage.de =>
+          'Ihre Partnerschaft bringt echten Mehrwert für unsere Plattform, und wir helfen dabei, Ihre Angebote jeden Monat professionell bei tausenden Reisenden zu bewerben.\n\n'
+              'Paketdetails:\n'
+              '• Erste 15 Tage: Ihr Eintrag wird komplett kostenlos hervorgehoben.\n'
+              '• Danach: ein monatliches Abonnement von 350 EGP, im Voraus zu Beginn jedes Monats zu zahlen.\n'
+              '• Bei verspäteter Zahlung: Ihr Eintrag wird vorübergehend pausiert, Ihre Daten bleiben jedoch gespeichert, bis Sie bereit sind, erneut zu aktivieren.\n\n'
+              'Wir melden uns in Kürze, um die Details zu bestätigen.',
+      };
+  static String get gotIt => switch (current) {
+        AppLanguage.ar => 'تمام',
+        AppLanguage.en => 'Got it',
+        AppLanguage.de => 'Verstanden',
+      };
 }

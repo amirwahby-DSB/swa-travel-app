@@ -729,7 +729,9 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
       ..writeln('${HomeStrings.companyNameLabel}: ${_companyNameCtrl.text}')
       ..writeln('${HomeStrings.serviceTypeLabel}: $_serviceType')
       ..writeln('${HomeStrings.contactInfoLabel}: ${_contactInfoCtrl.text}')
-      ..writeln('${HomeStrings.offerDescriptionLabel}: ${_descriptionCtrl.text}');
+      ..writeln('${HomeStrings.offerDescriptionLabel}: ${_descriptionCtrl.text}')
+      ..writeln()
+      ..writeln(HomeStrings.companyWelcomeBody);
     return buffer.toString();
   }
 
@@ -759,6 +761,11 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
     );
 
     Navigator.of(context).pop();
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (_) => const _CompanyWelcomeDialog(),
+    );
   }
 
   @override
@@ -880,7 +887,66 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
   }
 }
 
-// ---------- Sign in / sign up dialog (Firebase Auth via REST) ----------
+// ---------- Post-submission welcome & package details dialog ----------
+class _CompanyWelcomeDialog extends StatelessWidget {
+  const _CompanyWelcomeDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [SwaColors.inkDeep, SwaColors.ink]),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.4), width: 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: SwaColors.gold.withOpacity(0.6), width: 1.2),
+                  gradient: RadialGradient(colors: [SwaColors.gold.withOpacity(0.18), Colors.transparent]),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.check_circle_outline, color: SwaColors.goldLight, size: 24),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                HomeStrings.companyWelcomeTitle,
+                style: HomeScreen._display(size: 18, color: Colors.white, weight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                HomeStrings.companyWelcomeBody,
+                style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.82), height: 1.7),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SwaColors.gold,
+                  foregroundColor: SwaColors.inkDeep,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(HomeStrings.gotIt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 class _AuthDialog extends StatefulWidget {
   final void Function(String email) onLoggedIn;
   const _AuthDialog({required this.onLoggedIn});
