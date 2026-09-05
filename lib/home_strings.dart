@@ -246,4 +246,46 @@ class HomeStrings {
         AppLanguage.en => 'against the Egyptian Pound',
         AppLanguage.de => 'gegenüber dem ägyptischen Pfund',
       };
+
+  // ---------- Authentication ----------
+  static String get signIn => switch (current) {
+        AppLanguage.ar => 'دخول',
+        AppLanguage.en => 'Sign in',
+        AppLanguage.de => 'Anmelden',
+      };
+  static String get signUp => switch (current) {
+        AppLanguage.ar => 'حساب جديد',
+        AppLanguage.en => 'Sign up',
+        AppLanguage.de => 'Registrieren',
+      };
+  static String get logout => switch (current) {
+        AppLanguage.ar => 'خروج',
+        AppLanguage.en => 'Log out',
+        AppLanguage.de => 'Abmelden',
+      };
+  static String get emailLabel => switch (current) {
+        AppLanguage.ar => 'الإيميل',
+        AppLanguage.en => 'Email',
+        AppLanguage.de => 'E-Mail',
+      };
+  static String get passwordLabel => switch (current) {
+        AppLanguage.ar => 'كلمة المرور',
+        AppLanguage.en => 'Password',
+        AppLanguage.de => 'Passwort',
+      };
+  static String get noAccountYet => switch (current) {
+        AppLanguage.ar => 'معندكش حساب؟ اعمل واحد',
+        AppLanguage.en => 'No account yet? Sign up',
+        AppLanguage.de => 'Noch kein Konto? Registrieren',
+      };
+  static String get haveAccountAlready => switch (current) {
+        AppLanguage.ar => 'عندك حساب بالفعل؟ ادخل',
+        AppLanguage.en => 'Already have an account? Sign in',
+        AppLanguage.de => 'Schon ein Konto? Anmelden',
+      };
+  static String get welcomeBack => switch (current) {
+        AppLanguage.ar => 'أهلاً بيك',
+        AppLanguage.en => 'Welcome',
+        AppLanguage.de => 'Willkommen',
+      };
 }

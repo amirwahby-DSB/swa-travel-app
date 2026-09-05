@@ -3,6 +3,7 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'firebase_service.dart';
 import 'home_strings.dart';
 
 // ---------- Brand palette (VIP travel: deep ink navy + champagne gold) ----------
@@ -32,10 +33,20 @@ class SwaTravelApp extends StatefulWidget {
 }
 
 class _SwaTravelAppState extends State<SwaTravelApp> {
+  String? _userEmail;
+
   void _setLanguage(AppLanguage lang) {
     setState(() {
       HomeStrings.current = lang;
     });
+  }
+
+  void _onLoggedIn(String email) {
+    setState(() => _userEmail = email);
+  }
+
+  void _onLoggedOut() {
+    setState(() => _userEmail = null);
   }
 
   @override
@@ -55,7 +66,12 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
       ),
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
-        child: HomeScreen(onLanguageChange: _setLanguage),
+        child: HomeScreen(
+          onLanguageChange: _setLanguage,
+          userEmail: _userEmail,
+          onLoggedIn: _onLoggedIn,
+          onLoggedOut: _onLoggedOut,
+        ),
       ),
     );
   }
@@ -93,7 +109,16 @@ class _PatternPainter extends CustomPainter {
 
 class HomeScreen extends StatelessWidget {
   final void Function(AppLanguage) onLanguageChange;
-  const HomeScreen({super.key, required this.onLanguageChange});
+  final String? userEmail;
+  final void Function(String email) onLoggedIn;
+  final VoidCallback onLoggedOut;
+  const HomeScreen({
+    super.key,
+    required this.onLanguageChange,
+    required this.userEmail,
+    required this.onLoggedIn,
+    required this.onLoggedOut,
+  });
 
   static const double _referenceWidth = 420.0;
 
@@ -174,7 +199,7 @@ class HomeScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildHeader(),
+                        _buildHeader(context),
                         _buildHero(),
                         _buildFeaturedOffers(isWide),
                         _buildCategories(),
@@ -231,7 +256,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ---------- Header: quiet wordmark, thin gold rule, no icon badge ----------
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
       decoration: const BoxDecoration(
@@ -245,7 +270,48 @@ class HomeScreen extends StatelessWidget {
             style: _display(size: 19, color: SwaColors.textDark, weight: FontWeight.w700),
           ),
           const Spacer(),
+          _buildAuthControl(context),
+          const SizedBox(width: 14),
           _buildLanguageSwitch(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuthControl(BuildContext context) {
+    if (userEmail != null) {
+      return InkWell(
+        onTap: onLoggedOut,
+        borderRadius: BorderRadius.circular(20),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_circle, size: 16, color: SwaColors.gold),
+            const SizedBox(width: 4),
+            Text(
+              HomeStrings.logout,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: SwaColors.textMuted),
+            ),
+          ],
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () => showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.55),
+        builder: (_) => _AuthDialog(onLoggedIn: onLoggedIn),
+      ),
+      borderRadius: BorderRadius.circular(20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.person_outline, size: 16, color: SwaColors.gold),
+          const SizedBox(width: 4),
+          Text(
+            HomeStrings.signIn,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: SwaColors.textMuted),
+          ),
         ],
       ),
     );
@@ -683,6 +749,15 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
     html.window.open(emailUri.toString(), '_blank');
     html.window.open(whatsappUri.toString(), '_blank');
 
+    // Fire-and-forget: persists the inquiry in Firestore too, independent
+    // of whether the WhatsApp/email windows actually got through.
+    FirebaseService.saveCompanyInquiry(
+      companyName: _companyNameCtrl.text,
+      serviceType: _serviceType,
+      contactInfo: _contactInfoCtrl.text,
+      description: _descriptionCtrl.text,
+    );
+
     Navigator.of(context).pop();
   }
 
@@ -801,6 +876,141 @@ class _CompanyInquiryDialogState extends State<_CompanyInquiryDialog> {
           validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
         ),
       ],
+    );
+  }
+}
+
+// ---------- Sign in / sign up dialog (Firebase Auth via REST) ----------
+class _AuthDialog extends StatefulWidget {
+  final void Function(String email) onLoggedIn;
+  const _AuthDialog({required this.onLoggedIn});
+
+  @override
+  State<_AuthDialog> createState() => _AuthDialogState();
+}
+
+class _AuthDialogState extends State<_AuthDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _isSignUp = false;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final user = _isSignUp
+          ? await FirebaseService.signUp(_emailCtrl.text.trim(), _passwordCtrl.text)
+          : await FirebaseService.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
+      widget.onLoggedIn(user.email);
+      if (mounted) Navigator.of(context).pop();
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _error = e.friendlyMessage(HomeStrings.isRtl);
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = HomeStrings.isRtl ? 'حصل خطأ، حاول تاني' : 'Something went wrong, please try again';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: SwaColors.ivory,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.3), width: 1),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _isSignUp ? HomeStrings.signUp : HomeStrings.signIn,
+                  style: HomeScreen._display(size: 19, color: SwaColors.textDark, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: HomeStrings.emailLabel,
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
+                  ),
+                  validator: (v) => (v == null || !v.contains('@')) ? HomeStrings.requiredFieldError : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: true,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: HomeStrings.passwordLabel,
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
+                  ),
+                  validator: (v) => (v == null || v.length < 6) ? HomeStrings.requiredFieldError : null,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_error!, style: TextStyle(fontSize: 11.5, color: Colors.red.shade700)),
+                ],
+                const SizedBox(height: 18),
+                ElevatedButton(
+                  onPressed: _loading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SwaColors.ink,
+                    foregroundColor: SwaColors.goldLight,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: _loading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.goldLight))
+                      : Text(_isSignUp ? HomeStrings.signUp : HomeStrings.signIn, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: _loading ? null : () => setState(() => _isSignUp = !_isSignUp),
+                  child: Text(
+                    _isSignUp ? HomeStrings.haveAccountAlready : HomeStrings.noAccountYet,
+                    style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
