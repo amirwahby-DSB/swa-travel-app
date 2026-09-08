@@ -323,4 +323,46 @@ class HomeStrings {
         AppLanguage.en => 'Got it',
         AppLanguage.de => 'Verstanden',
       };
+
+  // ---------- Manage offers (admin) ----------
+  static String get manageOffers => switch (current) {
+        AppLanguage.ar => 'إدارة العروض',
+        AppLanguage.en => 'Manage Offers',
+        AppLanguage.de => 'Angebote verwalten',
+      };
+  static String get addOffer => switch (current) {
+        AppLanguage.ar => '+ أضف عرض',
+        AppLanguage.en => '+ Add offer',
+        AppLanguage.de => '+ Angebot hinzufügen',
+      };
+  static String get offerTitleLabel => switch (current) {
+        AppLanguage.ar => 'عنوان العرض',
+        AppLanguage.en => 'Offer title',
+        AppLanguage.de => 'Angebotstitel',
+      };
+  static String get offerPriceLabel => switch (current) {
+        AppLanguage.ar => 'السعر',
+        AppLanguage.en => 'Price',
+        AppLanguage.de => 'Preis',
+      };
+  static String get imageFileLabel => switch (current) {
+        AppLanguage.ar => 'اسم ملف الصورة في web/offer_images (اختياري)',
+        AppLanguage.en => 'Image filename in web/offer_images (optional)',
+        AppLanguage.de => 'Bilddateiname in web/offer_images (optional)',
+      };
+  static String get pdfFileLabel => switch (current) {
+        AppLanguage.ar => 'اسم ملف PDF في web/offer_images (اختياري)',
+        AppLanguage.en => 'PDF filename in web/offer_images (optional)',
+        AppLanguage.de => 'PDF-Dateiname in web/offer_images (optional)',
+      };
+  static String get offerAddedSuccess => switch (current) {
+        AppLanguage.ar => 'تمت إضافة العرض بنجاح',
+        AppLanguage.en => 'Offer added successfully',
+        AppLanguage.de => 'Angebot erfolgreich hinzugefügt',
+      };
+  static String get viewPdf => switch (current) {
+        AppLanguage.ar => 'عرض PDF',
+        AppLanguage.en => 'View PDF',
+        AppLanguage.de => 'PDF ansehen',
+      };
 }

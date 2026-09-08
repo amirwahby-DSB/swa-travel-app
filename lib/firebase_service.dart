@@ -79,6 +79,70 @@ class FirebaseService {
     // Best-effort: if this fails, the WhatsApp/email paths (called
     // alongside it) still deliver the inquiry, so no error is surfaced.
   }
+
+  /// Adds a new listing to the `offers` Firestore collection. Images/PDFs
+  /// themselves are NOT uploaded here — they're expected to already be
+  /// placed as static files under web/offer_images/ in the project (and
+  /// published via the normal git push + Codemagic build cycle). This
+  /// call only stores the offer's text fields plus the filenames.
+  static Future<void> addOffer({
+    required String title,
+    required String description,
+    required String price,
+    required String category,
+    String? imageFile,
+    String? pdfFile,
+  }) async {
+    final body = {
+      'fields': {
+        'title': {'stringValue': title},
+        'description': {'stringValue': description},
+        'price': {'stringValue': price},
+        'category': {'stringValue': category},
+        'imageFile': {'stringValue': imageFile ?? ''},
+        'pdfFile': {'stringValue': pdfFile ?? ''},
+        'createdAt': {'timestampValue': DateTime.now().toUtc().toIso8601String()},
+      },
+    };
+    final response = await http.post(
+      Uri.parse('$_firestoreBase/offers'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add offer: ${response.body}');
+    }
+  }
+
+  /// Fetches all documents in the `offers` collection, newest first.
+  /// Returns a plain list of maps with the offer's fields already
+  /// unwrapped from Firestore's typed-value format. Returns an empty
+  /// list (never throws) if the collection doesn't exist yet or the
+  /// request fails, so callers can safely fall back to demo content.
+  static Future<List<Map<String, String>>> getOffers() async {
+    try {
+      final response = await http.get(Uri.parse('$_firestoreBase/offers'));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final documents = data['documents'] as List<dynamic>?;
+      if (documents == null) return [];
+      final offers = documents.map((doc) {
+        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+        String field(String key) => (fields[key]?['stringValue'] as String?) ?? '';
+        return {
+          'title': field('title'),
+          'description': field('description'),
+          'price': field('price'),
+          'category': field('category'),
+          'imageFile': field('imageFile'),
+          'pdfFile': field('pdfFile'),
+        };
+      }).toList();
+      return offers;
+    } catch (_) {
+      return [];
+    }
+  }
 }
 
 class FirebaseUser {

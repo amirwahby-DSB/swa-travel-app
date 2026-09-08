@@ -107,6 +107,245 @@ class _PatternPainter extends CustomPainter {
   bool shouldRepaint(covariant _PatternPainter oldDelegate) => false;
 }
 
+const String _kWhatsappNumber = '201223275747';
+
+void _launchWhatsAppMessage(String offerTitle) {
+  final message = HomeStrings.isRtl
+      ? 'أهلاً، أنا مهتم بـ: $offerTitle - SWA Travel'
+      : 'Hi, I\'m interested in: $offerTitle - SWA Travel';
+  final uri = Uri.parse('https://wa.me/$_kWhatsappNumber?text=${Uri.encodeComponent(message)}');
+  html.window.open(uri.toString(), '_blank');
+}
+
+/// Renders one offer card. `o` may come from the hardcoded demo list
+/// (has an 'icon' and numeric 'rating') or from an admin-added Firestore
+/// document (has 'imageFile'/'pdfFile' instead, and no rating).
+Widget _buildOfferCardWidget(Map<String, dynamic> o) {
+  final featured = o['featured'] == true;
+  final imageFile = (o['imageFile'] as String?) ?? '';
+  final pdfFile = (o['pdfFile'] as String?) ?? '';
+  final rating = o['rating'];
+
+  return Container(
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [SwaColors.ink, Color(0xFF132938)],
+      ),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: featured ? SwaColors.gold.withOpacity(0.55) : SwaColors.inkLine, width: featured ? 1.2 : 1),
+      boxShadow: featured
+          ? [BoxShadow(color: SwaColors.gold.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 8))]
+          : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
+    ),
+    padding: const EdgeInsets.all(16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(23),
+          child: Container(
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1),
+              shape: imageFile.isEmpty ? BoxShape.circle : BoxShape.rectangle,
+            ),
+            child: imageFile.isNotEmpty
+                ? Image.network(
+                    'offer_images/$imageFile',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(o['icon'] as IconData? ?? Icons.local_offer_outlined, color: SwaColors.gold, size: 20),
+                  )
+                : Icon(o['icon'] as IconData? ?? Icons.local_offer_outlined, color: SwaColors.gold, size: 20),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (featured)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'FEATURED',
+                    style: const TextStyle(fontSize: 9, color: SwaColors.gold, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                  ),
+                ),
+              Text(o['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white)),
+              const SizedBox(height: 2),
+              Text(o['sub'] as String, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
+              const SizedBox(height: 6),
+              if (rating != null)
+                Row(
+                  children: [
+                    Icon(Icons.star, size: 12, color: SwaColors.gold.withOpacity(0.9)),
+                    const SizedBox(width: 3),
+                    Text('$rating', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.75))),
+                  ],
+                ),
+              if (pdfFile.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: InkWell(
+                    onTap: () => html.window.open('offer_images/$pdfFile', '_blank'),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.picture_as_pdf_outlined, size: 12, color: SwaColors.goldLight),
+                        const SizedBox(width: 3),
+                        Text(HomeStrings.viewPdf, style: const TextStyle(fontSize: 10.5, color: SwaColors.goldLight, decoration: TextDecoration.underline)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => _launchWhatsAppMessage(o['title'] as String),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF25D366).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF25D366).withOpacity(0.5), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
+                    const SizedBox(width: 4),
+                    Text(
+                      HomeStrings.isRtl ? 'واتساب' : 'WhatsApp',
+                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF25D366)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+/// Featured offers, now backed by Firestore: the 4 demo listings always
+/// show first (so the page never looks empty), followed by any real
+/// offers an admin has added via the Manage Offers panel. Only the
+/// platform admin (identified by exact email match) sees the
+/// "Add offer" entry point at the top of this section.
+class _FeaturedOffersSection extends StatefulWidget {
+  final bool isWide;
+  final String? userEmail;
+  const _FeaturedOffersSection({required this.isWide, required this.userEmail});
+
+  @override
+  State<_FeaturedOffersSection> createState() => _FeaturedOffersSectionState();
+}
+
+class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
+  // Single source of truth for "who can manage offers" — checked by exact
+  // email match, NOT just isLoggedIn. Keep this in sync with any other
+  // admin-only checks in the app.
+  static const String _adminEmail = 'egyptswawork@gmail.com';
+
+  List<Map<String, String>> _adminOffers = [];
+  bool _loading = true;
+
+  bool get _isAdmin => widget.userEmail == _adminEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final offers = await FirebaseService.getOffers();
+    if (mounted) {
+      setState(() {
+        _adminOffers = offers;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final demoOffers = <Map<String, dynamic>>[
+      {'title': HomeStrings.offer1Title, 'sub': HomeStrings.offer1Sub, 'price': HomeStrings.offer1Price, 'icon': Icons.flight_outlined, 'featured': true, 'rating': 4.8},
+      {'title': HomeStrings.offer4Title, 'sub': HomeStrings.offer4Sub, 'price': HomeStrings.offer4Price, 'icon': Icons.hotel_outlined, 'featured': false, 'rating': 4.7},
+      {'title': HomeStrings.offer2Title, 'sub': HomeStrings.offer2Sub, 'price': HomeStrings.offer2Price, 'icon': Icons.directions_car_outlined, 'featured': false, 'rating': 4.6},
+      {'title': HomeStrings.offer3Title, 'sub': HomeStrings.offer3Sub, 'price': HomeStrings.offer3Price, 'icon': Icons.apartment_outlined, 'featured': false, 'rating': 4.9},
+    ];
+    final adminCards = _adminOffers.map<Map<String, dynamic>>((o) => {
+          'title': o['title'] ?? '',
+          'sub': o['category'] ?? '',
+          'price': o['price'] ?? '',
+          'icon': Icons.local_offer_outlined,
+          'featured': false,
+          'imageFile': o['imageFile'],
+          'pdfFile': o['pdfFile'],
+        }).toList();
+    final offers = [...demoOffers, ...adminCards];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 30, 22, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(width: 18, height: 1.4, color: SwaColors.gold),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(HomeStrings.featuredOffersTitle, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: SwaColors.textDark, letterSpacing: 0.2)),
+              ),
+              if (_isAdmin)
+                InkWell(
+                  onTap: () async {
+                    await showDialog(
+                      context: context,
+                      barrierColor: Colors.black.withOpacity(0.55),
+                      builder: (_) => const _AddOfferDialog(),
+                    );
+                    _load();
+                  },
+                  child: Text(HomeStrings.addOffer, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SwaColors.gold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.gold))),
+            )
+          else if (widget.isWide)
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: offers.map((o) => SizedBox(width: 340, child: _buildOfferCardWidget(o))).toList(),
+            )
+          else
+            Column(
+              children: offers.map((o) => Padding(padding: const EdgeInsets.only(bottom: 14), child: _buildOfferCardWidget(o))).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatelessWidget {
   final void Function(AppLanguage) onLanguageChange;
   final String? userEmail;
@@ -131,17 +370,6 @@ class HomeScreen extends StatelessWidget {
     double? height,
   }) {
     return GoogleFonts.amiri(fontSize: size, color: color, fontWeight: weight, height: height);
-  }
-
-  // ---------- WhatsApp quick-contact ----------
-  static const String _whatsappNumber = '201223275747';
-
-  Future<void> _openWhatsApp(String offerTitle) async {
-    final message = HomeStrings.isRtl
-        ? 'أهلاً، أنا مهتم بـ: $offerTitle - SWA Travel'
-        : 'Hi, I\'m interested in: $offerTitle - SWA Travel';
-    final uri = Uri.parse('https://wa.me/$_whatsappNumber?text=${Uri.encodeComponent(message)}');
-    html.window.open(uri.toString(), '_blank');
   }
 
   @override
@@ -468,121 +696,7 @@ class HomeScreen extends StatelessWidget {
 
   // ---------- Featured Offers: dark cards, thin gold rule, outline icon ----------
   Widget _buildFeaturedOffers(bool isWide) {
-    final offers = [
-      {'title': HomeStrings.offer1Title, 'sub': HomeStrings.offer1Sub, 'price': HomeStrings.offer1Price, 'icon': Icons.flight_outlined, 'featured': true, 'rating': 4.8},
-      {'title': HomeStrings.offer4Title, 'sub': HomeStrings.offer4Sub, 'price': HomeStrings.offer4Price, 'icon': Icons.hotel_outlined, 'featured': false, 'rating': 4.7},
-      {'title': HomeStrings.offer2Title, 'sub': HomeStrings.offer2Sub, 'price': HomeStrings.offer2Price, 'icon': Icons.directions_car_outlined, 'featured': false, 'rating': 4.6},
-      {'title': HomeStrings.offer3Title, 'sub': HomeStrings.offer3Sub, 'price': HomeStrings.offer3Price, 'icon': Icons.apartment_outlined, 'featured': false, 'rating': 4.9},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 30, 22, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionLabel(HomeStrings.featuredOffersTitle),
-          const SizedBox(height: 16),
-          if (isWide)
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: offers.map((o) => SizedBox(width: 340, child: _offerCard(o))).toList(),
-            )
-          else
-            Column(
-              children: offers.map((o) => Padding(padding: const EdgeInsets.only(bottom: 14), child: _offerCard(o))).toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _offerCard(Map<String, Object> o) {
-    final featured = o['featured'] as bool;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [SwaColors.ink, Color(0xFF132938)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: featured ? SwaColors.gold.withOpacity(0.55) : SwaColors.inkLine, width: featured ? 1.2 : 1),
-        boxShadow: featured
-            ? [BoxShadow(color: SwaColors.gold.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 8))]
-            : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(o['icon'] as IconData, color: SwaColors.gold, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (featured)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      'FEATURED',
-                      style: const TextStyle(fontSize: 9, color: SwaColors.gold, fontWeight: FontWeight.w700, letterSpacing: 0.6),
-                    ),
-                  ),
-                Text(o['title'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white)),
-                const SizedBox(height: 2),
-                Text(o['sub'] as String, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.star, size: 12, color: SwaColors.gold.withOpacity(0.9)),
-                    const SizedBox(width: 3),
-                    Text('${o['rating']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.75))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () => _openWhatsApp(o['title'] as String),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF25D366).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF25D366).withOpacity(0.5), width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
-                      const SizedBox(width: 4),
-                      Text(
-                        HomeStrings.isRtl ? 'واتساب' : 'WhatsApp',
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF25D366)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return _FeaturedOffersSection(isWide: isWide, userEmail: userEmail);
   }
 
   // ---------- Categories: quiet ivory rows with a gold rule, not colored tiles ----------
@@ -941,6 +1055,192 @@ class _CompanyWelcomeDialog extends StatelessWidget {
                 child: Text(HomeStrings.gotIt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Admin: add a new offer (Firestore) ----------
+class _AddOfferDialog extends StatefulWidget {
+  const _AddOfferDialog();
+
+  @override
+  State<_AddOfferDialog> createState() => _AddOfferDialogState();
+}
+
+class _AddOfferDialogState extends State<_AddOfferDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
+  final _imageCtrl = TextEditingController();
+  final _pdfCtrl = TextEditingController();
+  late String _category;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = HomeStrings.catTrips;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _priceCtrl.dispose();
+    _imageCtrl.dispose();
+    _pdfCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await FirebaseService.addOffer(
+        title: _titleCtrl.text,
+        description: _descCtrl.text,
+        price: _priceCtrl.text,
+        category: _category,
+        imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
+        pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      setState(() {
+        _error = HomeStrings.isRtl ? 'حصل خطأ، حاول تاني' : 'Something went wrong, please try again';
+        _saving = false;
+      });
+    }
+  }
+
+  InputDecoration _decoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = [
+      HomeStrings.catTrips,
+      HomeStrings.catHotels,
+      HomeStrings.catFlights,
+      HomeStrings.catLimo,
+      HomeStrings.catConference,
+    ];
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: SwaColors.ivory,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.3), width: 1),
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    HomeStrings.manageOffers,
+                    style: HomeScreen._display(size: 18, color: SwaColors.textDark, weight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _titleCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.offerTitleLabel),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _descCtrl,
+                    maxLines: 2,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.offerDescriptionLabel),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _priceCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.offerPriceLabel),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? HomeStrings.requiredFieldError : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _category,
+                    isExpanded: true,
+                    decoration: _decoration(HomeStrings.serviceTypeLabel),
+                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+                    onChanged: (v) => setState(() => _category = v ?? _category),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _imageCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.imageFileLabel),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _pdfCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.pdfFileLabel),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_error!, style: TextStyle(fontSize: 11.5, color: Colors.red.shade700)),
+                  ],
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                          child: Text(HomeStrings.cancelButton, style: const TextStyle(color: SwaColors.textMuted, fontSize: 13)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: _saving ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: SwaColors.ink,
+                            foregroundColor: SwaColors.goldLight,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: _saving
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.goldLight))
+                              : Text(HomeStrings.submitButton, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
