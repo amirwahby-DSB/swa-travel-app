@@ -46,6 +46,9 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
   }
 
   void _onLoggedOut() {
+    // Clear the stored ID token too — otherwise a stale token could still
+    // be attached to admin-only requests (e.g. addOffer) after sign-out.
+    FirebaseService.setSessionToken(null);
     setState(() => _userEmail = null);
   }
 
