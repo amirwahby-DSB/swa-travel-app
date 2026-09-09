@@ -15,6 +15,25 @@ class FirebaseService {
   static String get _firestoreBase =>
       'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents';
 
+  /// Holds the signed-in user's ID token in memory for the current
+  /// session, so Firestore requests that require auth (per the security
+  /// rules) can attach it. Set on sign in/up, cleared on sign out.
+  /// NOTE: this resets on page reload — see session persistence (separate
+  /// task) for keeping the user logged in across reloads.
+  static String? _idToken;
+
+  static void setSessionToken(String? idToken) {
+    _idToken = idToken;
+  }
+
+  static Map<String, String> _authHeaders() {
+    final headers = {'Content-Type': 'application/json'};
+    if (_idToken != null) {
+      headers['Authorization'] = 'Bearer $_idToken';
+    }
+    return headers;
+  }
+
   /// Creates a new email/password account. Returns the user's email and
   /// uid on success, or throws a FirebaseAuthException with a readable
   /// message on failure.
@@ -24,7 +43,9 @@ class FirebaseService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password, 'returnSecureToken': true}),
     );
-    return _parseAuthResponse(response);
+    final user = _parseAuthResponse(response);
+    _idToken = user.idToken;
+    return user;
   }
 
   /// Signs an existing user in. Same return/throw behavior as [signUp].
@@ -34,7 +55,9 @@ class FirebaseService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password, 'returnSecureToken': true}),
     );
-    return _parseAuthResponse(response);
+    final user = _parseAuthResponse(response);
+    _idToken = user.idToken;
+    return user;
   }
 
   static FirebaseUser _parseAuthResponse(http.Response response) {
@@ -54,8 +77,9 @@ class FirebaseService {
   }
 
   /// Saves a company partnership inquiry to the `company_inquiries`
-  /// Firestore collection. Firestore is currently in test mode, so no
-  /// auth token is required for this write.
+  /// Firestore collection. This write does NOT require sign-in — the
+  /// security rules allow public create on this collection so any
+  /// visiting company can submit the form.
   static Future<void> saveCompanyInquiry({
     required String companyName,
     required String serviceType,
@@ -85,6 +109,10 @@ class FirebaseService {
   /// placed as static files under web/offer_images/ in the project (and
   /// published via the normal git push + Codemagic build cycle). This
   /// call only stores the offer's text fields plus the filenames.
+  ///
+  /// Requires the caller to be signed in as the admin — the security
+  /// rules reject this write without a valid, matching auth token, so
+  /// the Authorization header below is required, not optional.
   static Future<void> addOffer({
     required String title,
     required String description,
@@ -106,7 +134,7 @@ class FirebaseService {
     };
     final response = await http.post(
       Uri.parse('$_firestoreBase/offers'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _authHeaders(),
       body: jsonEncode(body),
     );
     if (response.statusCode != 200) {
@@ -119,6 +147,7 @@ class FirebaseService {
   /// unwrapped from Firestore's typed-value format. Returns an empty
   /// list (never throws) if the collection doesn't exist yet or the
   /// request fails, so callers can safely fall back to demo content.
+  /// This is a public read, so no auth header is needed.
   static Future<List<Map<String, String>>> getOffers() async {
     try {
       final response = await http.get(Uri.parse('$_firestoreBase/offers'));
