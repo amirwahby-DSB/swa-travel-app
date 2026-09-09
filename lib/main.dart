@@ -656,19 +656,21 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [SwaColors.goldLight, SwaColors.gold],
-                ).createShader(bounds),
-                child: Text(
-                  HomeStrings.heroTitle,
-                  textAlign: TextAlign.center,
-                  style: _display(
-                    size: HomeStrings.isRtl ? 27 : 21,
-                    color: Colors.white,
-                    weight: FontWeight.w700,
-                    height: 1.35,
-                  ),
+              // NOTE: previously wrapped in a ShaderMask + LinearGradient to give
+              // the headline a gold gradient fill. That combination (ShaderMask +
+              // a custom Google Font + narrow real mobile viewport) was triggering
+              // a "Null check operator used on a null value" crash on real phones
+              // once the viewport meta tag was fixed and the app actually rendered
+              // at true mobile width. Replaced with a plain solid gold color —
+              // visually very close, and removes the crash entirely.
+              Text(
+                HomeStrings.heroTitle,
+                textAlign: TextAlign.center,
+                style: _display(
+                  size: HomeStrings.isRtl ? 27 : 21,
+                  color: SwaColors.goldLight,
+                  weight: FontWeight.w700,
+                  height: 1.35,
                 ),
               ),
               const SizedBox(height: 14),
