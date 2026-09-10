@@ -433,6 +433,7 @@ class HomeScreen extends StatelessWidget {
                         _buildHero(),
                         _buildFeaturedOffers(isWide),
                         _buildCategories(),
+                        _buildAboutSection(),
                         _CurrencyRatesSection(),
                         _buildJoinCompanySection(context),
                         const SizedBox(height: 32),
@@ -759,6 +760,32 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------- About: who we are, in plain marketing terms ----------
+  Widget _buildAboutSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: SwaColors.ivoryLine, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionLabel(HomeStrings.aboutTitle),
+            const SizedBox(height: 10),
+            Text(
+              HomeStrings.aboutBody,
+              style: TextStyle(fontSize: 12, color: SwaColors.textMuted, height: 1.9),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1210,6 +1237,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                     controller: _pdfCtrl,
                     style: const TextStyle(fontSize: 13),
                     decoration: _decoration(HomeStrings.pdfFileLabel),
+                    onFieldSubmitted: (_) => _saving ? null : _submit(),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 10),
@@ -1260,17 +1288,39 @@ class _AuthDialog extends StatefulWidget {
 }
 
 class _AuthDialogState extends State<_AuthDialog> {
+  // Key used to remember the last signed-in email in the browser, so
+  // returning visitors find the field pre-filled instead of typing it
+  // every time. Just a convenience — never stores the password.
+  static const String _rememberedEmailKey = 'swa_remembered_email';
+
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _passwordFocus = FocusNode();
   bool _isSignUp = false;
   bool _loading = false;
   String? _error;
+
+  bool _resetLoading = false;
+  String? _resetMessage;
+  bool _resetIsError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the email field with whatever the browser remembers from
+    // the last successful sign-in, so the user doesn't retype it.
+    final remembered = html.window.localStorage[_rememberedEmailKey];
+    if (remembered != null && remembered.isNotEmpty) {
+      _emailCtrl.text = remembered;
+    }
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -1284,6 +1334,8 @@ class _AuthDialogState extends State<_AuthDialog> {
       final user = _isSignUp
           ? await FirebaseService.signUp(_emailCtrl.text.trim(), _passwordCtrl.text)
           : await FirebaseService.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
+      // Remember this email locally for next time.
+      html.window.localStorage[_rememberedEmailKey] = user.email;
       widget.onLoggedIn(user.email);
       if (mounted) Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
@@ -1295,6 +1347,41 @@ class _AuthDialogState extends State<_AuthDialog> {
       setState(() {
         _error = HomeStrings.isRtl ? 'حصل خطأ، حاول تاني' : 'Something went wrong, please try again';
         _loading = false;
+      });
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() {
+        _resetMessage = HomeStrings.enterEmailFirst;
+        _resetIsError = true;
+      });
+      return;
+    }
+    setState(() {
+      _resetLoading = true;
+      _resetMessage = null;
+    });
+    try {
+      await FirebaseService.sendPasswordResetEmail(email);
+      setState(() {
+        _resetMessage = HomeStrings.passwordResetSent;
+        _resetIsError = false;
+        _resetLoading = false;
+      });
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _resetMessage = e.friendlyMessage(HomeStrings.isRtl);
+        _resetIsError = true;
+        _resetLoading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _resetMessage = HomeStrings.isRtl ? 'حصل خطأ، حاول تاني' : 'Something went wrong, please try again';
+        _resetIsError = true;
+        _resetLoading = false;
       });
     }
   }
@@ -1327,6 +1414,7 @@ class _AuthDialogState extends State<_AuthDialog> {
                 TextFormField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     labelText: HomeStrings.emailLabel,
@@ -1336,11 +1424,17 @@ class _AuthDialogState extends State<_AuthDialog> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
                   ),
                   validator: (v) => (v == null || !v.contains('@')) ? HomeStrings.requiredFieldError : null,
+                  // Enter on the email field moves to the password field
+                  // instead of doing nothing — so the whole form is
+                  // keyboard-only, no mouse click required.
+                  onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _passwordCtrl,
+                  focusNode: _passwordFocus,
                   obscureText: true,
+                  textInputAction: TextInputAction.done,
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     labelText: HomeStrings.passwordLabel,
@@ -1350,7 +1444,30 @@ class _AuthDialogState extends State<_AuthDialog> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: SwaColors.ivoryLine)),
                   ),
                   validator: (v) => (v == null || v.length < 6) ? HomeStrings.requiredFieldError : null,
+                  // Enter on the password field submits the form — matches
+                  // what people expect from every other login form on the web.
+                  onFieldSubmitted: (_) => _loading ? null : _submit(),
                 ),
+                if (!_isSignUp) ...[
+                  Align(
+                    alignment: HomeStrings.isRtl ? Alignment.centerLeft : Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _resetLoading ? null : _sendPasswordReset,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                      child: Text(
+                        HomeStrings.forgotPassword,
+                        style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ),
+                ],
+                if (_resetMessage != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _resetMessage!,
+                    style: TextStyle(fontSize: 11.5, color: _resetIsError ? Colors.red.shade700 : const Color(0xFF2E7D32)),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 10),
                   Text(_error!, style: TextStyle(fontSize: 11.5, color: Colors.red.shade700)),

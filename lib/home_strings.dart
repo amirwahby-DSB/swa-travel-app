@@ -131,6 +131,21 @@ class HomeStrings {
         AppLanguage.de => '$n Unternehmen',
       };
 
+  // ---------- About us ----------
+  static String get aboutTitle => switch (current) {
+        AppLanguage.ar => 'من نحن',
+        AppLanguage.en => 'About Us',
+        AppLanguage.de => 'Über uns',
+      };
+  static String get aboutBody => switch (current) {
+        AppLanguage.ar =>
+          'نحن لسنا شركة سياحة واحدة، بل بوابتك لأفضل ما تقدمه شركات السياحة الموثوقة في مكان واحد. نبحث دائمًا عن أقوى العروض وأكثرها تنافسية، ونحدّثها أولًا بأول لضمان حصولك على أفضل قيمة ممكنة. من رحلات الأفراد إلى استضافة المعسكرات والوفود الدولية داخل مصر، نصمم لك الحل الذي يناسب احتياجك بالضبط — ببرامج مخصوصة تُبنى خصيصًا لك، لا عروض جاهزة للجميع.',
+        AppLanguage.en =>
+          'We\'re not a single travel company — we\'re your gateway to the best that trusted travel companies have to offer, all in one place. We constantly search for the strongest, most competitive deals and refresh them continuously, so you always get real value. From individual trips to hosting international camps and delegations across Egypt, we tailor the right solution for you — with fully customized programs built around your exact needs, not one-size-fits-all packages.',
+        AppLanguage.de =>
+          'Wir sind kein einzelnes Reiseunternehmen — wir sind Ihr Zugang zu den besten Angeboten vertrauenswürdiger Reiseunternehmen, alle an einem Ort. Wir suchen ständig nach den stärksten, wettbewerbsfähigsten Angeboten und aktualisieren sie laufend, damit Sie stets den besten Wert erhalten. Von individuellen Reisen bis zur Aufnahme internationaler Camps und Delegationen in ganz Ägypten – wir entwickeln die passende Lösung genau für Sie, mit maßgeschneiderten Programmen statt Standardpaketen.',
+      };
+
   // ---------- Company inquiry ("Submit your offer as a company") ----------
   static String get joinAsCompanyButton => switch (current) {
         AppLanguage.ar => 'قدّم عرضك كشركة',
@@ -287,6 +302,21 @@ class HomeStrings {
         AppLanguage.ar => 'أهلاً بيك',
         AppLanguage.en => 'Welcome',
         AppLanguage.de => 'Willkommen',
+      };
+  static String get forgotPassword => switch (current) {
+        AppLanguage.ar => 'نسيت كلمة المرور؟',
+        AppLanguage.en => 'Forgot password?',
+        AppLanguage.de => 'Passwort vergessen?',
+      };
+  static String get enterEmailFirst => switch (current) {
+        AppLanguage.ar => 'من فضلك اكتب إيميلك في الحقل فوق الأول',
+        AppLanguage.en => 'Please enter your email in the field above first',
+        AppLanguage.de => 'Bitte geben Sie zuerst Ihre E-Mail-Adresse oben ein',
+      };
+  static String get passwordResetSent => switch (current) {
+        AppLanguage.ar => 'تم إرسال رابط إعادة تعيين كلمة المرور إلى إيميلك',
+        AppLanguage.en => 'A password reset link has been sent to your email',
+        AppLanguage.de => 'Ein Link zum Zurücksetzen des Passworts wurde an Ihre E-Mail gesendet',
       };
 
   // ---------- Company welcome / package confirmation ----------

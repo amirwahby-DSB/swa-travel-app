@@ -60,6 +60,25 @@ class FirebaseService {
     return user;
   }
 
+  /// Sends a Firebase-hosted "reset your password" email to the given
+  /// address via the Identity Toolkit REST API (no plugin needed, same
+  /// approach as signIn/signUp above). Firebase deliberately returns a
+  /// generic success response even for emails that aren't registered, so
+  /// this can't be used to check whether an account exists — which is
+  /// intentional, standard behavior to avoid leaking that information.
+  static Future<void> sendPasswordResetEmail(String email) async {
+    final response = await http.post(
+      Uri.parse('$_authBase:sendOobCode?key=$_apiKey'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'requestType': 'PASSWORD_RESET', 'email': email}),
+    );
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final code = (data['error']?['message'] as String?) ?? 'UNKNOWN_ERROR';
+      throw FirebaseAuthException(code);
+    }
+  }
+
   static FirebaseUser _parseAuthResponse(http.Response response) {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200) {
