@@ -424,7 +424,7 @@ class HomeScreen extends StatelessWidget {
                             ],
                           )
                         : null,
-                    clipBehavior: Clip.antiAlias,
+                    clipBehavior: isDesktop ? Clip.antiAlias : Clip.none,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
