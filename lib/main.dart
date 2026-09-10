@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'firebase_service.dart';
 import 'home_strings.dart';
@@ -65,7 +64,7 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
           primary: SwaColors.ink,
           secondary: SwaColors.gold,
         ),
-        textTheme: GoogleFonts.cairoTextTheme(),
+        fontFamily: 'Cairo',
       ),
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
@@ -372,7 +371,7 @@ class HomeScreen extends StatelessWidget {
     FontWeight weight = FontWeight.w700,
     double? height,
   }) {
-    return GoogleFonts.amiri(fontSize: size, color: color, fontWeight: weight, height: height);
+    return TextStyle(fontFamily: 'Amiri', fontSize: size, color: color, fontWeight: weight, height: height);
   }
 
   @override

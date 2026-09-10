@@ -35,6 +35,21 @@
 </head>
 <body>
   <!--
+    Force the HTML renderer instead of CanvasKit. CanvasKit has a known
+    engine-level bug where laying out certain text (in our case, the Arabic
+    hero title) at very narrow widths — like a real phone screen — throws
+    "Null check operator used on a null value" and the whole app crashes
+    before it can draw a single frame. The HTML renderer draws text using
+    the browser's own text engine instead, which sidesteps that bug
+    entirely, and is also a smaller download (helpful on slow connections).
+  -->
+  <script>
+    window.flutterConfiguration = {
+      renderer: "html"
+    };
+  </script>
+
+  <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
     or to give the user feedback during the initialization process.
