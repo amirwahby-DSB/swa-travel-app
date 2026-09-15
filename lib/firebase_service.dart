@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 
 /// Talks to Firebase directly over its REST APIs (Identity Toolkit for
@@ -17,13 +18,38 @@ class FirebaseService {
 
   /// Holds the signed-in user's ID token in memory for the current
   /// session, so Firestore requests that require auth (per the security
-  /// rules) can attach it. Set on sign in/up, cleared on sign out.
-  /// NOTE: this resets on page reload — see session persistence (separate
-  /// task) for keeping the user logged in across reloads.
+  /// rules) can attach it. Also mirrored into the browser's localStorage
+  /// (together with the longer-lived refresh token) so a page reload can
+  /// restore the session instead of forcing a fresh sign-in — see
+  /// [restoreSession].
   static String? _idToken;
+  static String? _refreshToken;
 
+  static const String _idTokenKey = 'swa_session_id_token';
+  static const String _refreshTokenKey = 'swa_session_refresh_token';
+  static const String _emailKey = 'swa_session_email';
+
+  /// Clears the current session (in memory and in localStorage). Pass a
+  /// non-null idToken to just update the in-memory token without touching
+  /// the rest of the persisted session (not normally needed — signIn/
+  /// signUp/restoreSession handle that themselves); pass null to fully
+  /// sign out.
   static void setSessionToken(String? idToken) {
     _idToken = idToken;
+    if (idToken == null) {
+      _refreshToken = null;
+      html.window.localStorage.remove(_idTokenKey);
+      html.window.localStorage.remove(_refreshTokenKey);
+      html.window.localStorage.remove(_emailKey);
+    }
+  }
+
+  static void _persistSession(FirebaseUser user) {
+    _idToken = user.idToken;
+    _refreshToken = user.refreshToken;
+    html.window.localStorage[_idTokenKey] = user.idToken;
+    html.window.localStorage[_refreshTokenKey] = user.refreshToken;
+    html.window.localStorage[_emailKey] = user.email;
   }
 
   static Map<String, String> _authHeaders() {
@@ -44,7 +70,7 @@ class FirebaseService {
       body: jsonEncode({'email': email, 'password': password, 'returnSecureToken': true}),
     );
     final user = _parseAuthResponse(response);
-    _idToken = user.idToken;
+    _persistSession(user);
     return user;
   }
 
@@ -56,8 +82,48 @@ class FirebaseService {
       body: jsonEncode({'email': email, 'password': password, 'returnSecureToken': true}),
     );
     final user = _parseAuthResponse(response);
-    _idToken = user.idToken;
+    _persistSession(user);
     return user;
+  }
+
+  /// Attempts to restore a previously signed-in session after a page
+  /// reload, using the refresh token saved in localStorage. The ID token
+  /// itself is short-lived (about an hour) and is never trusted on its
+  /// own across reloads — this exchanges the refresh token for a brand
+  /// new ID token via Firebase's Secure Token API.
+  ///
+  /// Returns the restored user's email on success, or null if there was
+  /// no saved session, or the refresh token has been revoked/expired (in
+  /// which case any stale saved session is cleared so the sign-in dialog
+  /// starts clean next time).
+  static Future<String?> restoreSession() async {
+    final refreshToken = html.window.localStorage[_refreshTokenKey];
+    final email = html.window.localStorage[_emailKey];
+    if (refreshToken == null || email == null) return null;
+    try {
+      final response = await http.post(
+        Uri.parse('https://securetoken.googleapis.com/v1/token?key=$_apiKey'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {'grant_type': 'refresh_token', 'refresh_token': refreshToken},
+      );
+      if (response.statusCode != 200) {
+        // Refresh token no longer valid — don't keep stale data around.
+        setSessionToken(null);
+        return null;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      _idToken = data['id_token'] as String;
+      _refreshToken = data['refresh_token'] as String;
+      // The refresh token can rotate on each use — keep localStorage in sync.
+      html.window.localStorage[_idTokenKey] = _idToken!;
+      html.window.localStorage[_refreshTokenKey] = _refreshToken!;
+      return email;
+    } catch (_) {
+      // Network hiccup — fail quietly this time rather than wiping a
+      // perfectly good saved session; the user just stays logged out
+      // until their next reload succeeds.
+      return null;
+    }
   }
 
   /// Sends a Firebase-hosted "reset your password" email to the given
@@ -92,6 +158,7 @@ class FirebaseService {
       uid: data['localId'] as String,
       email: data['email'] as String,
       idToken: data['idToken'] as String,
+      refreshToken: data['refreshToken'] as String,
     );
   }
 
@@ -197,7 +264,8 @@ class FirebaseUser {
   final String uid;
   final String email;
   final String idToken;
-  FirebaseUser({required this.uid, required this.email, required this.idToken});
+  final String refreshToken;
+  FirebaseUser({required this.uid, required this.email, required this.idToken, required this.refreshToken});
 }
 
 class FirebaseAuthException implements Exception {

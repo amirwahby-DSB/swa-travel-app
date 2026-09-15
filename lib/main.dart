@@ -33,6 +33,27 @@ class SwaTravelApp extends StatefulWidget {
 
 class _SwaTravelAppState extends State<SwaTravelApp> {
   String? _userEmail;
+  // True only for the brief moment while we check whether a previous
+  // session can be restored from localStorage after a page reload. Kept
+  // separate from _userEmail so the sign-in UI doesn't flash on screen
+  // for a split second before the restored session is applied.
+  bool _restoringSession = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final email = await FirebaseService.restoreSession();
+    if (mounted) {
+      setState(() {
+        _userEmail = email;
+        _restoringSession = false;
+      });
+    }
+  }
 
   void _setLanguage(AppLanguage lang) {
     setState(() {
@@ -68,12 +89,23 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
       ),
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
-        child: HomeScreen(
-          onLanguageChange: _setLanguage,
-          userEmail: _userEmail,
-          onLoggedIn: _onLoggedIn,
-          onLoggedOut: _onLoggedOut,
-        ),
+        child: _restoringSession
+            ? const Scaffold(
+                backgroundColor: SwaColors.ivory,
+                body: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: SwaColors.gold),
+                  ),
+                ),
+              )
+            : HomeScreen(
+                onLanguageChange: _setLanguage,
+                userEmail: _userEmail,
+                onLoggedIn: _onLoggedIn,
+                onLoggedOut: _onLoggedOut,
+              ),
       ),
     );
   }
