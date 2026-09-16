@@ -395,4 +395,29 @@ class HomeStrings {
         AppLanguage.en => 'View PDF',
         AppLanguage.de => 'PDF ansehen',
       };
+  static String get editOfferTitle => switch (current) {
+        AppLanguage.ar => 'تعديل العرض',
+        AppLanguage.en => 'Edit offer',
+        AppLanguage.de => 'Angebot bearbeiten',
+      };
+  static String get deleteOfferConfirmTitle => switch (current) {
+        AppLanguage.ar => 'حذف العرض؟',
+        AppLanguage.en => 'Delete this offer?',
+        AppLanguage.de => 'Angebot löschen?',
+      };
+  static String get deleteOfferConfirmBody => switch (current) {
+        AppLanguage.ar => 'مش هينفع تتراجع عن الحذف بعد كده.',
+        AppLanguage.en => 'This cannot be undone.',
+        AppLanguage.de => 'Dies kann nicht rückgängig gemacht werden.',
+      };
+  static String get deleteButton => switch (current) {
+        AppLanguage.ar => 'حذف',
+        AppLanguage.en => 'Delete',
+        AppLanguage.de => 'Löschen',
+      };
+  static String get noOffersYet => switch (current) {
+        AppLanguage.ar => 'لسه مفيش عروض مضافة',
+        AppLanguage.en => 'No offers added yet',
+        AppLanguage.de => 'Noch keine Angebote hinzugefügt',
+      };
 }

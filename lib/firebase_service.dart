@@ -228,12 +228,57 @@ class FirebaseService {
     }
   }
 
+  /// Overwrites an existing offer's fields in place. Same auth
+  /// requirement as [addOffer] — only the signed-in admin can call this
+  /// successfully, per the Firestore security rules.
+  static Future<void> updateOffer({
+    required String id,
+    required String title,
+    required String description,
+    required String price,
+    required String category,
+    String? imageFile,
+    String? pdfFile,
+  }) async {
+    final body = {
+      'fields': {
+        'title': {'stringValue': title},
+        'description': {'stringValue': description},
+        'price': {'stringValue': price},
+        'category': {'stringValue': category},
+        'imageFile': {'stringValue': imageFile ?? ''},
+        'pdfFile': {'stringValue': pdfFile ?? ''},
+      },
+    };
+    final response = await http.patch(
+      Uri.parse('$_firestoreBase/offers/$id'),
+      headers: _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update offer: ${response.body}');
+    }
+  }
+
+  /// Permanently deletes an offer. Same auth requirement as [addOffer].
+  static Future<void> deleteOffer(String id) async {
+    final response = await http.delete(
+      Uri.parse('$_firestoreBase/offers/$id'),
+      headers: _authHeaders(),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete offer: ${response.body}');
+    }
+  }
+
   /// Fetches all documents in the `offers` collection, newest first.
   /// Returns a plain list of maps with the offer's fields already
-  /// unwrapped from Firestore's typed-value format. Returns an empty
-  /// list (never throws) if the collection doesn't exist yet or the
-  /// request fails, so callers can safely fall back to demo content.
-  /// This is a public read, so no auth header is needed.
+  /// unwrapped from Firestore's typed-value format, plus an 'id' field
+  /// (the Firestore document ID) so callers can target a specific offer
+  /// for [updateOffer]/[deleteOffer]. Returns an empty list (never
+  /// throws) if the collection doesn't exist yet or the request fails,
+  /// so callers can safely fall back to demo content. This is a public
+  /// read, so no auth header is needed.
   static Future<List<Map<String, String>>> getOffers() async {
     try {
       final response = await http.get(Uri.parse('$_firestoreBase/offers'));
@@ -244,7 +289,9 @@ class FirebaseService {
       final offers = documents.map((doc) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         String field(String key) => (fields[key]?['stringValue'] as String?) ?? '';
+        final name = (doc['name'] as String?) ?? '';
         return {
+          'id': name.split('/').last,
           'title': field('title'),
           'description': field('description'),
           'price': field('price'),

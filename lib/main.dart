@@ -350,11 +350,11 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
                     await showDialog(
                       context: context,
                       barrierColor: Colors.black.withOpacity(0.55),
-                      builder: (_) => const _AddOfferDialog(),
+                      builder: (_) => const _ManageOffersDialog(),
                     );
                     _load();
                   },
-                  child: Text(HomeStrings.addOffer, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SwaColors.gold)),
+                  child: Text(HomeStrings.manageOffers, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SwaColors.gold)),
                 ),
             ],
           ),
@@ -1127,7 +1127,8 @@ class _CompanyWelcomeDialog extends StatelessWidget {
 
 // ---------- Admin: add a new offer (Firestore) ----------
 class _AddOfferDialog extends StatefulWidget {
-  const _AddOfferDialog();
+  final Map<String, String>? existingOffer;
+  const _AddOfferDialog({this.existingOffer});
 
   @override
   State<_AddOfferDialog> createState() => _AddOfferDialogState();
@@ -1144,10 +1145,23 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
   bool _saving = false;
   String? _error;
 
+  bool get _isEditing => widget.existingOffer != null;
+
   @override
   void initState() {
     super.initState();
-    _category = HomeStrings.catTrips;
+    final existing = widget.existingOffer;
+    if (existing != null) {
+      _titleCtrl.text = existing['title'] ?? '';
+      _descCtrl.text = existing['description'] ?? '';
+      _priceCtrl.text = existing['price'] ?? '';
+      _imageCtrl.text = existing['imageFile'] ?? '';
+      _pdfCtrl.text = existing['pdfFile'] ?? '';
+      final existingCategory = existing['category'];
+      _category = (existingCategory != null && existingCategory.isNotEmpty) ? existingCategory : HomeStrings.catTrips;
+    } else {
+      _category = HomeStrings.catTrips;
+    }
   }
 
   @override
@@ -1167,14 +1181,26 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
       _error = null;
     });
     try {
-      await FirebaseService.addOffer(
-        title: _titleCtrl.text,
-        description: _descCtrl.text,
-        price: _priceCtrl.text,
-        category: _category,
-        imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
-        pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
-      );
+      if (_isEditing) {
+        await FirebaseService.updateOffer(
+          id: widget.existingOffer!['id']!,
+          title: _titleCtrl.text,
+          description: _descCtrl.text,
+          price: _priceCtrl.text,
+          category: _category,
+          imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
+          pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
+        );
+      } else {
+        await FirebaseService.addOffer(
+          title: _titleCtrl.text,
+          description: _descCtrl.text,
+          price: _priceCtrl.text,
+          category: _category,
+          imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
+          pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
+        );
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       setState(() {
@@ -1225,7 +1251,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    HomeStrings.manageOffers,
+                    _isEditing ? HomeStrings.editOfferTitle : HomeStrings.addOffer,
                     style: HomeScreen._display(size: 18, color: SwaColors.textDark, weight: FontWeight.w700),
                   ),
                   const SizedBox(height: 16),
@@ -1311,6 +1337,230 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
     );
   }
 }
+
+// ---------- Admin: manage offers — list real Firestore offers with
+// edit/delete actions, plus a button to add a new one. This is what the
+// "إدارة العروض" entry point opens now, instead of jumping straight to
+// the add-offer form. ----------
+class _ManageOffersDialog extends StatefulWidget {
+  const _ManageOffersDialog();
+
+  @override
+  State<_ManageOffersDialog> createState() => _ManageOffersDialogState();
+}
+
+class _ManageOffersDialogState extends State<_ManageOffersDialog> {
+  List<Map<String, String>> _offers = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final offers = await FirebaseService.getOffers();
+    if (mounted) {
+      setState(() {
+        _offers = offers;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openAddOrEdit({Map<String, String>? existing}) async {
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (_) => _AddOfferDialog(existingOffer: existing),
+    );
+    _load();
+  }
+
+  Future<void> _confirmDelete(Map<String, String> offer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: SwaColors.ivory,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SwaColors.gold.withOpacity(0.3), width: 1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  HomeStrings.deleteOfferConfirmTitle,
+                  style: HomeScreen._display(size: 17, color: SwaColors.textDark, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(HomeStrings.deleteOfferConfirmBody, style: const TextStyle(fontSize: 12.5, color: SwaColors.textMuted)),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: Text(HomeStrings.cancelButton, style: const TextStyle(color: SwaColors.textMuted, fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: Text(HomeStrings.deleteButton, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (confirmed == true) {
+      await FirebaseService.deleteOffer(offer['id']!);
+      _load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: SwaColors.ivory,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: SwaColors.gold.withOpacity(0.3), width: 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      HomeStrings.manageOffers,
+                      style: HomeScreen._display(size: 18, color: SwaColors.textDark, weight: FontWeight.w700),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close, color: SwaColors.textMuted, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _openAddOrEdit(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SwaColors.ink,
+                    foregroundColor: SwaColors.goldLight,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(HomeStrings.addOffer, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.gold)),
+                        ),
+                      )
+                    : _offers.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Text(
+                              HomeStrings.noOffersYet,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 12.5, color: SwaColors.textMuted),
+                            ),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: _offers.length,
+                            separatorBuilder: (_, __) => const Divider(height: 18, color: SwaColors.ivoryLine),
+                            itemBuilder: (context, index) {
+                              final offer = _offers[index];
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          offer['title'] ?? '',
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(offer['price'] ?? '', style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted)),
+                                      ],
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => _openAddOrEdit(existing: offer),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(6),
+                                      child: Icon(Icons.edit_outlined, size: 18, color: SwaColors.gold),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => _confirmDelete(offer),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(6),
+                                      child: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AuthDialog extends StatefulWidget {
   final void Function(String email) onLoggedIn;
   const _AuthDialog({required this.onLoggedIn});
