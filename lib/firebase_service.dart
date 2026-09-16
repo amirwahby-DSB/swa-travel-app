@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
+import 'translation_service.dart';
 
 /// Talks to Firebase directly over its REST APIs (Identity Toolkit for
 /// Auth, Firestore REST for the database) instead of using the official
@@ -190,11 +191,22 @@ class FirebaseService {
     // alongside it) still deliver the inquiry, so no error is surfaced.
   }
 
-  /// Adds a new listing to the `offers` Firestore collection. Images/PDFs
-  /// themselves are NOT uploaded here — they're expected to already be
-  /// placed as static files under web/offer_images/ in the project (and
-  /// published via the normal git push + Codemagic build cycle). This
-  /// call only stores the offer's text fields plus the filenames.
+  /// Adds a new listing to the `offers` Firestore collection. The admin
+  /// only types Arabic — [title]/[description]/[price] are all expected
+  /// to be Arabic text, and this method automatically translates each
+  /// into English and German (via [TranslationService]) before saving,
+  /// storing all three versions as separate fields (e.g. title_ar,
+  /// title_en, title_de) so the site can show the right language without
+  /// re-translating on every page load. [categoryKey] is one of the
+  /// fixed, language-neutral keys ('trips', 'hotels', 'flights', 'limo',
+  /// 'conference') — the actual localized label is looked up from
+  /// HomeStrings at display time, the same way the 4 demo offers work.
+  ///
+  /// Images/PDFs themselves are NOT uploaded here — they're expected to
+  /// already be placed as static files under web/offer_images/ in the
+  /// project (and published via the normal git push + Codemagic build
+  /// cycle). This call only stores the offer's text fields plus the
+  /// filenames.
   ///
   /// Requires the caller to be signed in as the admin — the security
   /// rules reject this write without a valid, matching auth token, so
@@ -203,16 +215,15 @@ class FirebaseService {
     required String title,
     required String description,
     required String price,
-    required String category,
+    required String categoryKey,
     String? imageFile,
     String? pdfFile,
   }) async {
+    final translated = await _translateToAll(title: title, description: description, price: price);
     final body = {
       'fields': {
-        'title': {'stringValue': title},
-        'description': {'stringValue': description},
-        'price': {'stringValue': price},
-        'category': {'stringValue': category},
+        ..._translatedFields(translated),
+        'category_key': {'stringValue': categoryKey},
         'imageFile': {'stringValue': imageFile ?? ''},
         'pdfFile': {'stringValue': pdfFile ?? ''},
         'createdAt': {'timestampValue': DateTime.now().toUtc().toIso8601String()},
@@ -228,24 +239,26 @@ class FirebaseService {
     }
   }
 
-  /// Overwrites an existing offer's fields in place. Same auth
-  /// requirement as [addOffer] — only the signed-in admin can call this
-  /// successfully, per the Firestore security rules.
+  /// Overwrites an existing offer's fields in place, re-translating the
+  /// Arabic input the same way [addOffer] does. Same auth requirement as
+  /// [addOffer] — only the signed-in admin can call this successfully,
+  /// per the Firestore security rules. Editing an offer that was created
+  /// before the translation system existed automatically upgrades it to
+  /// the new per-language field format.
   static Future<void> updateOffer({
     required String id,
     required String title,
     required String description,
     required String price,
-    required String category,
+    required String categoryKey,
     String? imageFile,
     String? pdfFile,
   }) async {
+    final translated = await _translateToAll(title: title, description: description, price: price);
     final body = {
       'fields': {
-        'title': {'stringValue': title},
-        'description': {'stringValue': description},
-        'price': {'stringValue': price},
-        'category': {'stringValue': category},
+        ..._translatedFields(translated),
+        'category_key': {'stringValue': categoryKey},
         'imageFile': {'stringValue': imageFile ?? ''},
         'pdfFile': {'stringValue': pdfFile ?? ''},
       },
@@ -271,14 +284,70 @@ class FirebaseService {
     }
   }
 
-  /// Fetches all documents in the `offers` collection, newest first.
-  /// Returns a plain list of maps with the offer's fields already
-  /// unwrapped from Firestore's typed-value format, plus an 'id' field
-  /// (the Firestore document ID) so callers can target a specific offer
-  /// for [updateOffer]/[deleteOffer]. Returns an empty list (never
-  /// throws) if the collection doesn't exist yet or the request fails,
-  /// so callers can safely fall back to demo content. This is a public
-  /// read, so no auth header is needed.
+  /// Runs all 6 translations (title/description/price × en/de) in
+  /// parallel so a save only takes as long as the single slowest
+  /// translation call, not all of them added up sequentially.
+  static Future<Map<String, String>> _translateToAll({
+    required String title,
+    required String description,
+    required String price,
+  }) async {
+    final results = await Future.wait([
+      TranslationService.translate(title, from: 'ar', to: 'en'),
+      TranslationService.translate(title, from: 'ar', to: 'de'),
+      TranslationService.translate(description, from: 'ar', to: 'en'),
+      TranslationService.translate(description, from: 'ar', to: 'de'),
+      TranslationService.translate(price, from: 'ar', to: 'en'),
+      TranslationService.translate(price, from: 'ar', to: 'de'),
+    ]);
+    return {
+      'title_ar': title,
+      'title_en': results[0],
+      'title_de': results[1],
+      'description_ar': description,
+      'description_en': results[2],
+      'description_de': results[3],
+      'price_ar': price,
+      'price_en': results[4],
+      'price_de': results[5],
+    };
+  }
+
+  static Map<String, Map<String, String>> _translatedFields(Map<String, String> translated) {
+    return translated.map((key, value) => MapEntry(key, {'stringValue': value}));
+  }
+
+  /// Best-effort mapping from an offer's old, single-language category
+  /// label (from before category_key existed) back to a stable key, so
+  /// offers added before this change keep showing the right category
+  /// instead of falling back to a wrong default.
+  static const Map<String, List<String>> _legacyCategoryLabels = {
+    'trips': ['رحلات', 'Trips', 'Ausflüge'],
+    'hotels': ['حجز فنادق', 'Hotel Booking', 'Hotelbuchung'],
+    'flights': ['تذاكر طيران', 'Flight tickets', 'Flugtickets'],
+    'limo': ['ليموزين', 'Limousine'],
+    'conference': ['قاعات ومساحات للإيجار', 'Halls & Venues for Rent', 'Säle & Veranstaltungsorte zur Miete'],
+  };
+
+  static String _categoryKeyFromLegacyLabel(String label) {
+    for (final entry in _legacyCategoryLabels.entries) {
+      if (entry.value.contains(label)) return entry.key;
+    }
+    return 'trips';
+  }
+
+  /// Fetches all documents in the `offers` collection. Returns a plain
+  /// list of maps with 'id', 'title_ar'/'title_en'/'title_de' (and the
+  /// same for 'description' and 'price'), 'category_key', 'imageFile'
+  /// and 'pdfFile'. Offers saved before the translation system existed
+  /// (which only had single 'title'/'description'/'price'/'category'
+  /// fields) are transparently upgraded here: the same original text is
+  /// used for all three languages, and the old category label is mapped
+  /// back to a stable key — so nothing old breaks or disappears, it just
+  /// won't be translated until the admin re-saves it. Returns an empty
+  /// list (never throws) if the collection doesn't exist yet or the
+  /// request fails, so callers can safely fall back to demo content.
+  /// This is a public read, so no auth header is needed.
   static Future<List<Map<String, String>>> getOffers() async {
     try {
       final response = await http.get(Uri.parse('$_firestoreBase/offers'));
@@ -290,12 +359,56 @@ class FirebaseService {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         String field(String key) => (fields[key]?['stringValue'] as String?) ?? '';
         final name = (doc['name'] as String?) ?? '';
+
+        final legacyTitle = field('title');
+        final legacyDescription = field('description');
+        final legacyPrice = field('price');
+        final legacyCategory = field('category');
+
+        String titleAr = field('title_ar');
+        String titleEn = field('title_en');
+        String titleDe = field('title_de');
+        if (titleAr.isEmpty && titleEn.isEmpty && titleDe.isEmpty && legacyTitle.isNotEmpty) {
+          titleAr = legacyTitle;
+          titleEn = legacyTitle;
+          titleDe = legacyTitle;
+        }
+
+        String descAr = field('description_ar');
+        String descEn = field('description_en');
+        String descDe = field('description_de');
+        if (descAr.isEmpty && descEn.isEmpty && descDe.isEmpty && legacyDescription.isNotEmpty) {
+          descAr = legacyDescription;
+          descEn = legacyDescription;
+          descDe = legacyDescription;
+        }
+
+        String priceAr = field('price_ar');
+        String priceEn = field('price_en');
+        String priceDe = field('price_de');
+        if (priceAr.isEmpty && priceEn.isEmpty && priceDe.isEmpty && legacyPrice.isNotEmpty) {
+          priceAr = legacyPrice;
+          priceEn = legacyPrice;
+          priceDe = legacyPrice;
+        }
+
+        String categoryKey = field('category_key');
+        if (categoryKey.isEmpty) {
+          categoryKey = legacyCategory.isNotEmpty ? _categoryKeyFromLegacyLabel(legacyCategory) : 'trips';
+        }
+
         return {
           'id': name.split('/').last,
-          'title': field('title'),
-          'description': field('description'),
-          'price': field('price'),
-          'category': field('category'),
+          'title_ar': titleAr,
+          'title_en': titleEn,
+          'title_de': titleDe,
+          'description_ar': descAr,
+          'description_en': descEn,
+          'description_de': descDe,
+          'price_ar': priceAr,
+          'price_en': priceEn,
+          'price_de': priceDe,
+          'category_key': categoryKey,
           'imageFile': field('imageFile'),
           'pdfFile': field('pdfFile'),
         };

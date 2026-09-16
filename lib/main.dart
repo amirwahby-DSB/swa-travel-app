@@ -143,6 +143,34 @@ class _PatternPainter extends CustomPainter {
 
 const String _kWhatsappNumber = '201223275747';
 
+/// The suffix used on translated Firestore fields (title_ar/title_en/...)
+/// for the currently selected UI language.
+String _langSuffix() => switch (HomeStrings.current) {
+      AppLanguage.ar => 'ar',
+      AppLanguage.en => 'en',
+      AppLanguage.de => 'de',
+    };
+
+/// Picks the value of a translated field (e.g. 'title') in whichever
+/// language is currently selected, from an admin-added offer map
+/// returned by FirebaseService.getOffers().
+String _pickByLanguage(Map<String, String> offer, String fieldBase) {
+  return offer['${fieldBase}_${_langSuffix()}'] ?? '';
+}
+
+/// Maps an offer's language-neutral category key back to the localized
+/// label — the same labels used for the category browse list — so an
+/// admin-added offer's category always matches the currently selected
+/// language, regardless of what language the admin was using when they
+/// added it.
+String _categoryLabelForKey(String key) => switch (key) {
+      'hotels' => HomeStrings.catHotels,
+      'flights' => HomeStrings.catFlights,
+      'limo' => HomeStrings.catLimo,
+      'conference' => HomeStrings.catConference,
+      _ => HomeStrings.catTrips,
+    };
+
 void _launchWhatsAppMessage(String offerTitle) {
   final message = HomeStrings.isRtl
       ? 'أهلاً، أنا مهتم بـ: $offerTitle - SWA Travel'
@@ -322,9 +350,9 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
       {'title': HomeStrings.offer3Title, 'sub': HomeStrings.offer3Sub, 'price': HomeStrings.offer3Price, 'icon': Icons.apartment_outlined, 'featured': false, 'rating': 4.9},
     ];
     final adminCards = _adminOffers.map<Map<String, dynamic>>((o) => {
-          'title': o['title'] ?? '',
-          'sub': o['category'] ?? '',
-          'price': o['price'] ?? '',
+          'title': _pickByLanguage(o, 'title'),
+          'sub': _categoryLabelForKey(o['category_key'] ?? 'trips'),
+          'price': _pickByLanguage(o, 'price'),
           'icon': Icons.local_offer_outlined,
           'featured': false,
           'imageFile': o['imageFile'],
@@ -1152,15 +1180,15 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
     super.initState();
     final existing = widget.existingOffer;
     if (existing != null) {
-      _titleCtrl.text = existing['title'] ?? '';
-      _descCtrl.text = existing['description'] ?? '';
-      _priceCtrl.text = existing['price'] ?? '';
+      _titleCtrl.text = existing['title_ar'] ?? '';
+      _descCtrl.text = existing['description_ar'] ?? '';
+      _priceCtrl.text = existing['price_ar'] ?? '';
       _imageCtrl.text = existing['imageFile'] ?? '';
       _pdfCtrl.text = existing['pdfFile'] ?? '';
-      final existingCategory = existing['category'];
-      _category = (existingCategory != null && existingCategory.isNotEmpty) ? existingCategory : HomeStrings.catTrips;
+      final existingCategoryKey = existing['category_key'];
+      _category = (existingCategoryKey != null && existingCategoryKey.isNotEmpty) ? existingCategoryKey : 'trips';
     } else {
-      _category = HomeStrings.catTrips;
+      _category = 'trips';
     }
   }
 
@@ -1187,7 +1215,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
           title: _titleCtrl.text,
           description: _descCtrl.text,
           price: _priceCtrl.text,
-          category: _category,
+          categoryKey: _category,
           imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
           pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
         );
@@ -1196,7 +1224,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
           title: _titleCtrl.text,
           description: _descCtrl.text,
           price: _priceCtrl.text,
-          category: _category,
+          categoryKey: _category,
           imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
           pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
         );
@@ -1223,12 +1251,12 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = [
-      HomeStrings.catTrips,
-      HomeStrings.catHotels,
-      HomeStrings.catFlights,
-      HomeStrings.catLimo,
-      HomeStrings.catConference,
+    final categoryOptions = <Map<String, String>>[
+      {'key': 'trips', 'label': HomeStrings.catTrips},
+      {'key': 'hotels', 'label': HomeStrings.catHotels},
+      {'key': 'flights', 'label': HomeStrings.catFlights},
+      {'key': 'limo', 'label': HomeStrings.catLimo},
+      {'key': 'conference', 'label': HomeStrings.catConference},
     ];
 
     return Dialog(
@@ -1253,6 +1281,11 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                   Text(
                     _isEditing ? HomeStrings.editOfferTitle : HomeStrings.addOffer,
                     style: HomeScreen._display(size: 18, color: SwaColors.textDark, weight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    HomeStrings.autoTranslateNote,
+                    style: TextStyle(fontSize: 11, color: SwaColors.textMuted, height: 1.5),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -1281,7 +1314,9 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                     initialValue: _category,
                     isExpanded: true,
                     decoration: _decoration(HomeStrings.serviceTypeLabel),
-                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+                    items: categoryOptions
+                        .map((c) => DropdownMenuItem(value: c['key'], child: Text(c['label']!, style: const TextStyle(fontSize: 12.5))))
+                        .toList(),
                     onChanged: (v) => setState(() => _category = v ?? _category),
                   ),
                   const SizedBox(height: 12),
@@ -1302,6 +1337,14 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                     Text(_error!, style: TextStyle(fontSize: 11.5, color: Colors.red.shade700)),
                   ],
                   const SizedBox(height: 18),
+                  if (_saving) ...[
+                    Text(
+                      HomeStrings.translatingInProgress,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11, color: SwaColors.textMuted),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -1522,13 +1565,13 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          offer['title'] ?? '',
+                                          offer['title_ar'] ?? '',
                                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 2),
-                                        Text(offer['price'] ?? '', style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted)),
+                                        Text(offer['price_ar'] ?? '', style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted)),
                                       ],
                                     ),
                                   ),

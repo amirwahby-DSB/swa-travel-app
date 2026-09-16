@@ -420,4 +420,14 @@ class HomeStrings {
         AppLanguage.en => 'No offers added yet',
         AppLanguage.de => 'Noch keine Angebote hinzugefügt',
       };
+  static String get autoTranslateNote => switch (current) {
+        AppLanguage.ar => 'اكتب البيانات بالعربي فقط — هيتم ترجمتها تلقائيًا للإنجليزي والألماني.',
+        AppLanguage.en => 'Enter details in Arabic only — they will be translated automatically into English and German.',
+        AppLanguage.de => 'Geben Sie die Details nur auf Arabisch ein – sie werden automatisch ins Englische und Deutsche übersetzt.',
+      };
+  static String get translatingInProgress => switch (current) {
+        AppLanguage.ar => 'جاري الحفظ والترجمة...',
+        AppLanguage.en => 'Saving and translating...',
+        AppLanguage.de => 'Wird gespeichert und übersetzt...',
+      };
 }
