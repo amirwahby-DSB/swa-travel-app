@@ -420,6 +420,11 @@ class HomeStrings {
         AppLanguage.en => 'No offers added yet',
         AppLanguage.de => 'Noch keine Angebote hinzugefügt',
       };
+  static String get noOffersPublic => switch (current) {
+        AppLanguage.ar => 'عروض جديدة قريبًا — تابعونا',
+        AppLanguage.en => 'New offers coming soon — stay tuned',
+        AppLanguage.de => 'Neue Angebote in Kürze — bleiben Sie dran',
+      };
   static String get autoTranslateNote => switch (current) {
         AppLanguage.ar => 'اكتب البيانات بالعربي فقط — هيتم ترجمتها تلقائيًا للإنجليزي والألماني.',
         AppLanguage.en => 'Enter details in Arabic only — they will be translated automatically into English and German.',
@@ -429,5 +434,40 @@ class HomeStrings {
         AppLanguage.ar => 'جاري الحفظ والترجمة...',
         AppLanguage.en => 'Saving and translating...',
         AppLanguage.de => 'Wird gespeichert und übersetzt...',
+      };
+  static String get companyWhatsappLabel => switch (current) {
+        AppLanguage.ar => 'واتساب الشركة (اختياري، لتذكير التجديد — بدون + أو مسافات، مثال 201223275747)',
+        AppLanguage.en => 'Company WhatsApp (optional, for renewal reminders — no + or spaces, e.g. 201223275747)',
+        AppLanguage.de => 'WhatsApp des Unternehmens (optional, für Erinnerungen — ohne + oder Leerzeichen, z. B. 201223275747)',
+      };
+  static String daysRemainingText(int days) => switch (current) {
+        AppLanguage.ar => 'متبقي $days يوم',
+        AppLanguage.en => '$days days left',
+        AppLanguage.de => 'Noch $days Tage',
+      };
+  static String get expiredLabel => switch (current) {
+        AppLanguage.ar => 'العرض منتهي',
+        AppLanguage.en => 'Offer expired',
+        AppLanguage.de => 'Angebot abgelaufen',
+      };
+  static String get renewButton => switch (current) {
+        AppLanguage.ar => 'تجديد 30 يوم',
+        AppLanguage.en => 'Renew 30 days',
+        AppLanguage.de => '30 Tage verlängern',
+      };
+  static String get sendReminderButton => switch (current) {
+        AppLanguage.ar => 'إرسال تذكير',
+        AppLanguage.en => 'Send reminder',
+        AppLanguage.de => 'Erinnerung senden',
+      };
+  static String get renewedSuccess => switch (current) {
+        AppLanguage.ar => 'تم تجديد العرض لمدة 30 يوم',
+        AppLanguage.en => 'Offer renewed for 30 days',
+        AppLanguage.de => 'Angebot um 30 Tage verlängert',
+      };
+  static String get noCompanyWhatsapp => switch (current) {
+        AppLanguage.ar => 'لازم تسجّل رقم واتساب الشركة الأول عشان تقدر تبعت تذكير',
+        AppLanguage.en => 'Add the company\'s WhatsApp number first to send a reminder',
+        AppLanguage.de => 'Fügen Sie zuerst die WhatsApp-Nummer des Unternehmens hinzu, um eine Erinnerung zu senden',
       };
 }

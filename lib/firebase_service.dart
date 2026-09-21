@@ -200,7 +200,15 @@ class FirebaseService {
   /// re-translating on every page load. [categoryKey] is one of the
   /// fixed, language-neutral keys ('trips', 'hotels', 'flights', 'limo',
   /// 'conference') — the actual localized label is looked up from
-  /// HomeStrings at display time, the same way the 4 demo offers work.
+  /// HomeStrings at display time. [companyWhatsapp] is optional and is
+  /// only used by the admin panel to pre-fill a renewal reminder
+  /// message — it's never shown to site visitors.
+  ///
+  /// A new offer is automatically set to expire 30 days from now
+  /// (stored as 'expiresAt') — it stops showing to visitors after that
+  /// unless the admin renews it via [renewOffer]. This matches the
+  /// platform's paid-subscription model (see the company welcome
+  /// message for the pricing terms).
   ///
   /// Images/PDFs themselves are NOT uploaded here — they're expected to
   /// already be placed as static files under web/offer_images/ in the
@@ -218,15 +226,19 @@ class FirebaseService {
     required String categoryKey,
     String? imageFile,
     String? pdfFile,
+    String? companyWhatsapp,
   }) async {
     final translated = await _translateToAll(title: title, description: description, price: price);
+    final now = DateTime.now().toUtc();
     final body = {
       'fields': {
         ..._translatedFields(translated),
         'category_key': {'stringValue': categoryKey},
         'imageFile': {'stringValue': imageFile ?? ''},
         'pdfFile': {'stringValue': pdfFile ?? ''},
-        'createdAt': {'timestampValue': DateTime.now().toUtc().toIso8601String()},
+        'company_whatsapp': {'stringValue': companyWhatsapp ?? ''},
+        'createdAt': {'timestampValue': now.toIso8601String()},
+        'expiresAt': {'timestampValue': now.add(const Duration(days: 30)).toIso8601String()},
       },
     };
     final response = await http.post(
@@ -239,12 +251,19 @@ class FirebaseService {
     }
   }
 
-  /// Overwrites an existing offer's fields in place, re-translating the
-  /// Arabic input the same way [addOffer] does. Same auth requirement as
-  /// [addOffer] — only the signed-in admin can call this successfully,
+  /// Overwrites an existing offer's content fields in place, re-translating
+  /// the Arabic input the same way [addOffer] does. Same auth requirement
+  /// as [addOffer] — only the signed-in admin can call this successfully,
   /// per the Firestore security rules. Editing an offer that was created
   /// before the translation system existed automatically upgrades it to
   /// the new per-language field format.
+  ///
+  /// Deliberately uses an explicit updateMask listing only the content
+  /// fields below — Firestore's PATCH replaces the *entire* document with
+  /// whatever fields are given when no mask is specified, which would
+  /// silently wipe 'expiresAt' (and 'createdAt') on every plain content
+  /// edit. A normal edit must never reset or lose the countdown; only
+  /// [renewOffer] is allowed to touch expiresAt.
   static Future<void> updateOffer({
     required String id,
     required String title,
@@ -253,6 +272,7 @@ class FirebaseService {
     required String categoryKey,
     String? imageFile,
     String? pdfFile,
+    String? companyWhatsapp,
   }) async {
     final translated = await _translateToAll(title: title, description: description, price: price);
     final body = {
@@ -261,10 +281,18 @@ class FirebaseService {
         'category_key': {'stringValue': categoryKey},
         'imageFile': {'stringValue': imageFile ?? ''},
         'pdfFile': {'stringValue': pdfFile ?? ''},
+        'company_whatsapp': {'stringValue': companyWhatsapp ?? ''},
       },
     };
+    const maskFields = [
+      'title_ar', 'title_en', 'title_de',
+      'description_ar', 'description_en', 'description_de',
+      'price_ar', 'price_en', 'price_de',
+      'category_key', 'imageFile', 'pdfFile', 'company_whatsapp',
+    ];
+    final maskQuery = maskFields.map((f) => 'updateMask.fieldPaths=$f').join('&');
     final response = await http.patch(
-      Uri.parse('$_firestoreBase/offers/$id'),
+      Uri.parse('$_firestoreBase/offers/$id?$maskQuery'),
       headers: _authHeaders(),
       body: jsonEncode(body),
     );
@@ -281,6 +309,28 @@ class FirebaseService {
     );
     if (response.statusCode != 200) {
       throw Exception('Failed to delete offer: ${response.body}');
+    }
+  }
+
+  /// Extends an offer's expiry by 30 days from right now (not from its
+  /// old expiry date — a lapsed offer being renewed starts a fresh 30
+  /// days from the moment the admin confirms payment). Uses an
+  /// updateMask limited to just 'expiresAt' so nothing else on the offer
+  /// is touched. Same auth requirement as [addOffer].
+  static Future<void> renewOffer(String id) async {
+    final newExpiry = DateTime.now().toUtc().add(const Duration(days: 30)).toIso8601String();
+    final body = {
+      'fields': {
+        'expiresAt': {'timestampValue': newExpiry},
+      },
+    };
+    final response = await http.patch(
+      Uri.parse('$_firestoreBase/offers/$id?updateMask.fieldPaths=expiresAt'),
+      headers: _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to renew offer: ${response.body}');
     }
   }
 
@@ -397,6 +447,18 @@ class FirebaseService {
           categoryKey = legacyCategory.isNotEmpty ? _categoryKeyFromLegacyLabel(legacyCategory) : 'trips';
         }
 
+        // expiresAt is stored as a Firestore timestamp, not a plain
+        // string field, so it needs its own extraction (not the
+        // stringValue-only `field()` helper above). Offers saved before
+        // this expiry system existed simply won't have it — returned as
+        // an empty string, which callers treat as "no expiry set" (never
+        // auto-hidden) rather than instantly expired, so nothing old
+        // vanishes unexpectedly. Returned as a raw ISO8601 string so both
+        // the homepage filter and the admin panel's days-remaining
+        // display compute status from the same value at the moment they
+        // actually need it, rather than a snapshot taken at fetch time.
+        final expiresAtRaw = (fields['expiresAt']?['timestampValue'] as String?) ?? '';
+
         return {
           'id': name.split('/').last,
           'title_ar': titleAr,
@@ -411,6 +473,8 @@ class FirebaseService {
           'category_key': categoryKey,
           'imageFile': field('imageFile'),
           'pdfFile': field('pdfFile'),
+          'company_whatsapp': field('company_whatsapp'),
+          'expiresAt': expiresAtRaw,
         };
       }).toList();
       return offers;

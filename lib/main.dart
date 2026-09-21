@@ -179,6 +179,29 @@ void _launchWhatsAppMessage(String offerTitle) {
   html.window.open(uri.toString(), '_blank');
 }
 
+/// Computes how many whole days remain until [expiresAtRaw] (an ISO8601
+/// string as stored by FirebaseService.getOffers()). Returns null when
+/// there's no expiry set at all (offers predating the expiry system, or
+/// something failed to parse) — callers should treat null as "no status
+/// to show", not as expired.
+int? _daysRemaining(String? expiresAtRaw) {
+  if (expiresAtRaw == null || expiresAtRaw.isEmpty) return null;
+  final expiresAt = DateTime.tryParse(expiresAtRaw);
+  if (expiresAt == null) return null;
+  final diffHours = expiresAt.difference(DateTime.now().toUtc()).inHours;
+  return (diffHours / 24).ceil();
+}
+
+/// Opens WhatsApp to the offer's company number (NOT the platform's own
+/// WhatsApp number) with a ready-to-send renewal reminder, so sending one
+/// from the manage-offers panel takes one tap instead of typing anything.
+void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr) {
+  final message = 'مرحبًا، عرضكم "$offerTitleAr" على منصة SWA Travel قارب على الانتهاء أو انتهى بالفعل. '
+      'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا. شكرًا لتعاونكم - فريق SWA Travel';
+  final uri = Uri.parse('https://wa.me/$companyWhatsapp?text=${Uri.encodeComponent(message)}');
+  html.window.open(uri.toString(), '_blank');
+}
+
 /// Renders one offer card. `o` may come from the hardcoded demo list
 /// (has an 'icon' and numeric 'rating') or from an admin-added Firestore
 /// document (has 'imageFile'/'pdfFile' instead, and no rating).
@@ -343,13 +366,20 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
 
   @override
   Widget build(BuildContext context) {
-    final demoOffers = <Map<String, dynamic>>[
-      {'title': HomeStrings.offer1Title, 'sub': HomeStrings.offer1Sub, 'price': HomeStrings.offer1Price, 'icon': Icons.flight_outlined, 'featured': true, 'rating': 4.8},
-      {'title': HomeStrings.offer4Title, 'sub': HomeStrings.offer4Sub, 'price': HomeStrings.offer4Price, 'icon': Icons.hotel_outlined, 'featured': false, 'rating': 4.7},
-      {'title': HomeStrings.offer2Title, 'sub': HomeStrings.offer2Sub, 'price': HomeStrings.offer2Price, 'icon': Icons.directions_car_outlined, 'featured': false, 'rating': 4.6},
-      {'title': HomeStrings.offer3Title, 'sub': HomeStrings.offer3Sub, 'price': HomeStrings.offer3Price, 'icon': Icons.apartment_outlined, 'featured': false, 'rating': 4.9},
-    ];
-    final adminCards = _adminOffers.map<Map<String, dynamic>>((o) => {
+    // Only real, non-expired offers are shown to visitors now — the 4
+    // fixed demo offers have been removed so the site reflects actual
+    // onboarded companies only. An offer with no expiresAt (shouldn't
+    // normally happen) is treated as still active rather than hidden.
+    final now = DateTime.now();
+    final activeOffers = _adminOffers.where((o) {
+      final expiresAt = o['expiresAt'];
+      if (expiresAt == null || expiresAt.isEmpty) return true;
+      final parsed = DateTime.tryParse(expiresAt);
+      if (parsed == null) return true;
+      return parsed.isAfter(now);
+    }).toList();
+
+    final offers = activeOffers.map<Map<String, dynamic>>((o) => {
           'title': _pickByLanguage(o, 'title'),
           'sub': _categoryLabelForKey(o['category_key'] ?? 'trips'),
           'price': _pickByLanguage(o, 'price'),
@@ -358,7 +388,6 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
           'imageFile': o['imageFile'],
           'pdfFile': o['pdfFile'],
         }).toList();
-    final offers = [...demoOffers, ...adminCards];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 30, 22, 8),
@@ -391,6 +420,15 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: SwaColors.gold))),
+            )
+          else if (offers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                HomeStrings.noOffersPublic,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12.5, color: SwaColors.textMuted),
+              ),
             )
           else if (widget.isWide)
             Wrap(
@@ -1169,6 +1207,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
   final _priceCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
   final _pdfCtrl = TextEditingController();
+  final _companyWhatsappCtrl = TextEditingController();
   late String _category;
   bool _saving = false;
   String? _error;
@@ -1185,6 +1224,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
       _priceCtrl.text = existing['price_ar'] ?? '';
       _imageCtrl.text = existing['imageFile'] ?? '';
       _pdfCtrl.text = existing['pdfFile'] ?? '';
+      _companyWhatsappCtrl.text = existing['company_whatsapp'] ?? '';
       final existingCategoryKey = existing['category_key'];
       _category = (existingCategoryKey != null && existingCategoryKey.isNotEmpty) ? existingCategoryKey : 'trips';
     } else {
@@ -1199,6 +1239,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
     _priceCtrl.dispose();
     _imageCtrl.dispose();
     _pdfCtrl.dispose();
+    _companyWhatsappCtrl.dispose();
     super.dispose();
   }
 
@@ -1218,6 +1259,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
           categoryKey: _category,
           imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
           pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
+          companyWhatsapp: _companyWhatsappCtrl.text.trim().isEmpty ? null : _companyWhatsappCtrl.text.trim(),
         );
       } else {
         await FirebaseService.addOffer(
@@ -1227,6 +1269,7 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
           categoryKey: _category,
           imageFile: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
           pdfFile: _pdfCtrl.text.trim().isEmpty ? null : _pdfCtrl.text.trim(),
+          companyWhatsapp: _companyWhatsappCtrl.text.trim().isEmpty ? null : _companyWhatsappCtrl.text.trim(),
         );
       }
       if (mounted) Navigator.of(context).pop();
@@ -1330,6 +1373,13 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
                     controller: _pdfCtrl,
                     style: const TextStyle(fontSize: 13),
                     decoration: _decoration(HomeStrings.pdfFileLabel),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _companyWhatsappCtrl,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _decoration(HomeStrings.companyWhatsappLabel),
                     onFieldSubmitted: (_) => _saving ? null : _submit(),
                   ),
                   if (_error != null) ...[
@@ -1420,6 +1470,32 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
       builder: (_) => _AddOfferDialog(existingOffer: existing),
     );
     _load();
+  }
+
+  Future<void> _renew(Map<String, String> offer) async {
+    try {
+      await FirebaseService.renewOffer(offer['id']!);
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(HomeStrings.renewedSuccess), duration: const Duration(seconds: 2)),
+        );
+      }
+    } catch (_) {
+      // Best-effort UI feedback only — the list will simply show the
+      // unchanged expiry if this fails, which is enough signal to retry.
+    }
+  }
+
+  void _sendReminder(Map<String, String> offer) {
+    final whatsapp = offer['company_whatsapp'] ?? '';
+    if (whatsapp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(HomeStrings.noCompanyWhatsapp), duration: const Duration(seconds: 3)),
+      );
+      return;
+    }
+    _launchRenewalReminder(whatsapp, offer['title_ar'] ?? '');
   }
 
   Future<void> _confirmDelete(Map<String, String> offer) async {
@@ -1558,39 +1634,98 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
                             separatorBuilder: (_, __) => const Divider(height: 18, color: SwaColors.ivoryLine),
                             itemBuilder: (context, index) {
                               final offer = _offers[index];
-                              return Row(
+                              final days = _daysRemaining(offer['expiresAt']);
+                              final isExpired = days != null && days <= 0;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          offer['title_ar'] ?? '',
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              offer['title_ar'] ?? '',
+                                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SwaColors.textDark),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(offer['price_ar'] ?? '', style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted)),
+                                          ],
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(offer['price_ar'] ?? '', style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted)),
+                                      ),
+                                      InkWell(
+                                        onTap: () => _openAddOrEdit(existing: offer),
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(6),
+                                          child: Icon(Icons.edit_outlined, size: 18, color: SwaColors.gold),
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () => _confirmDelete(offer),
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(6),
+                                          child: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (days != null) ...[
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          isExpired ? Icons.error_outline : Icons.schedule,
+                                          size: 13,
+                                          color: isExpired ? Colors.redAccent : SwaColors.textMuted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          isExpired ? HomeStrings.expiredLabel : HomeStrings.daysRemainingText(days),
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: isExpired ? FontWeight.w700 : FontWeight.w500,
+                                            color: isExpired ? Colors.redAccent : SwaColors.textMuted,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        InkWell(
+                                          onTap: () => _sendReminder(offer),
+                                          borderRadius: BorderRadius.circular(14),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.chat_outlined, size: 13, color: Color(0xFF25D366)),
+                                                const SizedBox(width: 3),
+                                                Text(HomeStrings.sendReminderButton, style: const TextStyle(fontSize: 10, color: Color(0xFF25D366), fontWeight: FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        InkWell(
+                                          onTap: () => _renew(offer),
+                                          borderRadius: BorderRadius.circular(14),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.autorenew, size: 13, color: SwaColors.gold),
+                                                const SizedBox(width: 3),
+                                                Text(HomeStrings.renewButton, style: const TextStyle(fontSize: 10, color: SwaColors.gold, fontWeight: FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => _openAddOrEdit(existing: offer),
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(6),
-                                      child: Icon(Icons.edit_outlined, size: 18, color: SwaColors.gold),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => _confirmDelete(offer),
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(6),
-                                      child: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               );
                             },
