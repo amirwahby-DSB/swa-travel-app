@@ -446,6 +446,168 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
   }
 }
 
+/// Interactive "browse by category" list. Tapping a category expands an
+/// inline list of that category's real, currently active offers right
+/// underneath it (an accordion, one open at a time) — this used to be a
+/// static, non-functional list with hardcoded fake company counts;
+/// counts here are computed from the actual offers in Firestore.
+class _CategoriesSection extends StatefulWidget {
+  const _CategoriesSection();
+
+  @override
+  State<_CategoriesSection> createState() => _CategoriesSectionState();
+}
+
+class _CategoriesSectionState extends State<_CategoriesSection> {
+  List<Map<String, String>> _activeOffers = [];
+  bool _loading = true;
+  String? _expandedKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final offers = await FirebaseService.getOffers();
+    // Only offers a visitor would actually see elsewhere on the page —
+    // same active/non-expired filter as the featured offers section.
+    final now = DateTime.now();
+    final active = offers.where((o) {
+      final expiresAt = o['expiresAt'];
+      if (expiresAt == null || expiresAt.isEmpty) return true;
+      final parsed = DateTime.tryParse(expiresAt);
+      if (parsed == null) return true;
+      return parsed.isAfter(now);
+    }).toList();
+    if (mounted) {
+      setState(() {
+        _activeOffers = active;
+        _loading = false;
+      });
+    }
+  }
+
+  List<Map<String, String>> _offersForCategory(String key) {
+    return _activeOffers.where((o) => (o['category_key'] ?? 'trips') == key).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = [
+      {'key': 'trips', 'label': HomeStrings.catTrips, 'icon': Icons.map_outlined},
+      {'key': 'hotels', 'label': HomeStrings.catHotels, 'icon': Icons.hotel_outlined},
+      {'key': 'flights', 'label': HomeStrings.catFlights, 'icon': Icons.confirmation_number_outlined},
+      {'key': 'limo', 'label': HomeStrings.catLimo, 'icon': Icons.directions_car_outlined},
+      {'key': 'conference', 'label': HomeStrings.catConference, 'icon': Icons.apartment_outlined},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          HomeScreen._sectionLabel(HomeStrings.browseByCategory),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: SwaColors.ivoryLine, width: 1),
+            ),
+            child: Column(
+              children: categories.asMap().entries.map((entry) {
+                final isLast = entry.key == categories.length - 1;
+                final c = entry.value;
+                final key = c['key'] as String;
+                final isExpanded = _expandedKey == key;
+                final matches = _offersForCategory(key);
+                final showBottomBorder = !isLast || isExpanded;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _expandedKey = isExpanded ? null : key),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                        decoration: BoxDecoration(
+                          border: showBottomBorder ? const Border(bottom: BorderSide(color: SwaColors.ivoryLine, width: 1)) : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: SwaColors.gold.withOpacity(0.45), width: 1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(c['icon'] as IconData, color: SwaColors.gold, size: 16),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(c['label'] as String, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SwaColors.textDark)),
+                            ),
+                            Text(
+                              _loading ? '' : HomeStrings.companiesCount(matches.length),
+                              style: const TextStyle(fontSize: 11, color: SwaColors.textMuted),
+                            ),
+                            const SizedBox(width: 10),
+                            Icon(
+                              isExpanded ? Icons.keyboard_arrow_down : (HomeStrings.isRtl ? Icons.arrow_back_ios_new : Icons.arrow_forward_ios),
+                              size: isExpanded ? 18 : 12,
+                              color: SwaColors.textMuted.withOpacity(0.6),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (isExpanded)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        decoration: BoxDecoration(
+                          color: SwaColors.ivory.withOpacity(0.5),
+                          border: isLast ? null : const Border(bottom: BorderSide(color: SwaColors.ivoryLine, width: 1)),
+                        ),
+                        child: matches.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Text(
+                                  HomeStrings.noOffersPublic,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 11.5, color: SwaColors.textMuted),
+                                ),
+                              )
+                            : Column(
+                                children: matches.map((o) {
+                                  final card = <String, dynamic>{
+                                    'title': _pickByLanguage(o, 'title'),
+                                    'sub': _categoryLabelForKey(o['category_key'] ?? 'trips'),
+                                    'price': _pickByLanguage(o, 'price'),
+                                    'icon': Icons.local_offer_outlined,
+                                    'featured': false,
+                                    'imageFile': o['imageFile'],
+                                    'pdfFile': o['pdfFile'],
+                                  };
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: _buildOfferCardWidget(card),
+                                  );
+                                }).toList(),
+                              ),
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatelessWidget {
   final void Function(AppLanguage) onLanguageChange;
   final String? userEmail;
@@ -530,7 +692,7 @@ class HomeScreen extends StatelessWidget {
                         _buildHeader(context),
                         _buildHero(),
                         _buildFeaturedOffers(isWide),
-                        _buildCategories(),
+                        const _CategoriesSection(),
                         _buildAboutSection(),
                         _CurrencyRatesSection(),
                         _buildJoinCompanySection(context),
@@ -803,65 +965,6 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ---------- Categories: quiet ivory rows with a gold rule, not colored tiles ----------
-  Widget _buildCategories() {
-    final categories = [
-      {'label': HomeStrings.catTrips, 'count': HomeStrings.companiesCount(9), 'icon': Icons.map_outlined},
-      {'label': HomeStrings.catHotels, 'count': HomeStrings.companiesCount(7), 'icon': Icons.hotel_outlined},
-      {'label': HomeStrings.catFlights, 'count': HomeStrings.companiesCount(6), 'icon': Icons.confirmation_number_outlined},
-      {'label': HomeStrings.catLimo, 'count': HomeStrings.companiesCount(4), 'icon': Icons.directions_car_outlined},
-      {'label': HomeStrings.catConference, 'count': HomeStrings.companiesCount(3), 'icon': Icons.apartment_outlined},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionLabel(HomeStrings.browseByCategory),
-          const SizedBox(height: 6),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: SwaColors.ivoryLine, width: 1),
-            ),
-            child: Column(
-              children: categories.asMap().entries.map((entry) {
-                final isLast = entry.key == categories.length - 1;
-                final c = entry.value;
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                  decoration: BoxDecoration(
-                    border: isLast ? null : const Border(bottom: BorderSide(color: SwaColors.ivoryLine, width: 1)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: SwaColors.gold.withOpacity(0.45), width: 1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(c['icon'] as IconData, color: SwaColors.gold, size: 16),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(c['label'] as String, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SwaColors.textDark)),
-                      ),
-                      Text(c['count'] as String, style: const TextStyle(fontSize: 11, color: SwaColors.textMuted)),
-                      const SizedBox(width: 10),
-                      Icon(HomeStrings.isRtl ? Icons.arrow_back_ios_new : Icons.arrow_forward_ios, size: 12, color: SwaColors.textMuted.withOpacity(0.6)),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---------- About: who we are, in plain marketing terms ----------
   Widget _buildAboutSection() {
     return Padding(
@@ -888,7 +991,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionLabel(String text) {
+  static Widget _sectionLabel(String text) {
     return Row(
       children: [
         Container(width: 18, height: 1.4, color: SwaColors.gold),
