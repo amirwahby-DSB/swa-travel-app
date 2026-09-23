@@ -348,6 +348,16 @@ class HomeStrings {
               '• Bei verspäteter Zahlung: Ihr Eintrag wird vorübergehend pausiert, Ihre Daten bleiben jedoch gespeichert, bis Sie bereit sind, erneut zu aktivieren.\n\n'
               'Wir melden uns in Kürze, um die Details zu bestätigen.',
       };
+  // Shown on-screen right after submission — deliberately does NOT
+  // repeat the pricing/package details above (those stay private,
+  // delivered only via the WhatsApp message and email that open
+  // alongside this dialog), so the on-screen moment reads as a warm,
+  // personal "we'll follow up" rather than an automated program pitch.
+  static String get companyWelcomeBodySimple => switch (current) {
+        AppLanguage.ar => 'شكرًا لتواصلكم معنا! هنراجع طلبكم ونرجعلكم بكل التفاصيل قريبًا عبر الإيميل أو واتساب.',
+        AppLanguage.en => 'Thank you for reaching out! We\'ll review your submission and get back to you soon with all the details by email or WhatsApp.',
+        AppLanguage.de => 'Vielen Dank für Ihre Anfrage! Wir prüfen Ihre Angaben und melden uns bald mit allen Details per E-Mail oder WhatsApp bei Ihnen.',
+      };
   static String get gotIt => switch (current) {
         AppLanguage.ar => 'تمام',
         AppLanguage.en => 'Got it',

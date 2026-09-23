@@ -692,7 +692,7 @@ class HomeScreen extends StatelessWidget {
                         _buildHeader(context),
                         _buildHero(),
                         _buildFeaturedOffers(isWide),
-                        const _CategoriesSection(),
+                        _CategoriesSection(),
                         _buildAboutSection(),
                         _CurrencyRatesSection(),
                         _buildJoinCompanySection(context),
@@ -1272,7 +1272,7 @@ class _CompanyWelcomeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                HomeStrings.companyWelcomeBody,
+                HomeStrings.companyWelcomeBodySimple,
                 style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.82), height: 1.7),
               ),
               const SizedBox(height: 20),
