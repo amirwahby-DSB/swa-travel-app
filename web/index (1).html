@@ -32,6 +32,17 @@
 
   <title>swa_travel_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Google Analytics: tracks page views and visitor counts. Loaded
+       from the head so it fires as early as possible, before Flutter's
+       own scripts start loading. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H08NWCHYTF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-H08NWCHYTF');
+  </script>
 </head>
 <body>
   <!--
