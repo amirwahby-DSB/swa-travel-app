@@ -9,13 +9,13 @@ import 'home_strings.dart';
 // A single accent color used consistently (not a different hue per section)
 // is what reads as "luxury membership" rather than "consumer app".
 class SwaColors {
-  static const ink = Color(0xFF0A1A26); // near-black navy, primary dark surface
-  static const inkDeep = Color(0xFF050F16); // deepest gradient stop
-  static const gold = Color(0xFFC9A24B); // champagne gold — the one accent
-  static const goldLight = Color(0xFFE4D2A0);
-  static const ivory = Color(0xFFF6F2E8); // warm off-white page background
-  static const ivoryLine = Color(0xFFE3DAC4); // hairline dividers on ivory
-  static const inkLine = Color(0x33C9A24B); // faint gold hairline on ink
+  static const ink = Color(0xFF0B2545); // approved brand navy — primary dark surface
+  static const inkDeep = Color(0xFF071731); // deepest gradient stop, derived from brand navy
+  static const gold = Color(0xFFD4AF37); // approved brand gold — the one accent
+  static const goldLight = Color(0xFFE8CE73);
+  static const ivory = Color(0xFFF7F5EB); // approved brand ivory — page background
+  static const ivoryLine = Color(0xFFE4E0D0); // hairline dividers on ivory
+  static const inkLine = Color(0x33D4AF37); // faint gold hairline on ink
   static const textDark = Color(0xFF1C2733);
   static const textMuted = Color(0xFF7A7368);
 }
@@ -90,13 +90,25 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
         child: _restoringSession
-            ? const Scaffold(
-                backgroundColor: SwaColors.ivory,
+            ? Scaffold(
+                backgroundColor: SwaColors.ink,
                 body: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.4, color: SwaColors.gold),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/logo_primary.png',
+                        width: 240,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 26),
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.4, color: SwaColors.gold),
+                      ),
+                    ],
                   ),
                 ),
               )
@@ -756,6 +768,19 @@ class HomeScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              width: 32,
+              height: 32,
+              fit: BoxFit.cover,
+              // If the asset hasn't been added to the project yet, fail
+              // gracefully instead of crashing the whole header.
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+          const SizedBox(width: 10),
           Text(
             HomeStrings.appName,
             style: _display(size: 19, color: SwaColors.textDark, weight: FontWeight.w700),
@@ -875,46 +900,51 @@ class HomeScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 460),
             child: Column(
               children: [
-                SizedBox(
-                  width: 88,
-                  height: 88,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                    // outer glow ring — same badge frame as before
-                    Container(
-                      width: 74,
-                      height: 74,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: SwaColors.gold.withOpacity(0.6), width: 1.3),
-                        gradient: RadialGradient(colors: [SwaColors.gold.withOpacity(0.18), Colors.transparent]),
-                        boxShadow: [BoxShadow(color: SwaColors.gold.withOpacity(0.25), blurRadius: 26, spreadRadius: 2)],
-                      ),
+                Image.asset(
+                  'assets/images/app_icon.png',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.contain,
+                  // Falls back to the previous hand-drawn badge if the
+                  // logo asset hasn't been added to the project yet, so
+                  // the hero never breaks mid-deploy.
+                  errorBuilder: (_, __, ___) => SizedBox(
+                    width: 88,
+                    height: 88,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 74,
+                          height: 74,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: SwaColors.gold.withOpacity(0.6), width: 1.3),
+                            gradient: RadialGradient(colors: [SwaColors.gold.withOpacity(0.18), Colors.transparent]),
+                            boxShadow: [BoxShadow(color: SwaColors.gold.withOpacity(0.25), blurRadius: 26, spreadRadius: 2)],
+                          ),
+                        ),
+                        Positioned(
+                          top: 6,
+                          right: 4,
+                          child: Transform.rotate(
+                            angle: -0.45,
+                            child: Icon(Icons.flight, size: 20, color: SwaColors.goldLight.withOpacity(0.55)),
+                          ),
+                        ),
+                        Positioned(
+                          top: 20,
+                          child: Icon(Icons.apartment_rounded, size: 32, color: SwaColors.goldLight),
+                        ),
+                        Positioned(
+                          bottom: 16,
+                          child: Icon(Icons.directions_car_filled_rounded, size: 26, color: Colors.white.withOpacity(0.95)),
+                        ),
+                      ],
                     ),
-                    // faint airplane, trailing off in the background — small and unobtrusive
-                    Positioned(
-                      top: 6,
-                      right: 4,
-                      child: Transform.rotate(
-                        angle: -0.45,
-                        child: Icon(Icons.flight, size: 20, color: SwaColors.goldLight.withOpacity(0.55)),
-                      ),
-                    ),
-                    // hotel — the single anchor element, centered and unobstructed
-                    Positioned(
-                      top: 20,
-                      child: Icon(Icons.apartment_rounded, size: 32, color: SwaColors.goldLight),
-                    ),
-                    // limousine, resting along the base of the badge
-                    Positioned(
-                      bottom: 16,
-                      child: Icon(Icons.directions_car_filled_rounded, size: 26, color: Colors.white.withOpacity(0.95)),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 24),
               // NOTE: previously wrapped in a ShaderMask + LinearGradient to give
               // the headline a gold gradient fill. That combination (ShaderMask +
