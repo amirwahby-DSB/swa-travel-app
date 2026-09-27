@@ -46,7 +46,17 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
   }
 
   Future<void> _restoreSession() async {
-    final email = await FirebaseService.restoreSession();
+    // The actual session check is often near-instant, which made the
+    // branded loading screen flash by too fast to register as a brand
+    // moment. Running it alongside a fixed minimum delay (via Future.wait)
+    // means the splash always shows for at least this long, however fast
+    // the network call itself finishes — without ever waiting longer than
+    // necessary when the check happens to be slow.
+    final results = await Future.wait([
+      FirebaseService.restoreSession(),
+      Future.delayed(const Duration(milliseconds: 2000)),
+    ]);
+    final email = results[0] as String?;
     if (mounted) {
       setState(() {
         _userEmail = email;
