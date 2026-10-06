@@ -46,7 +46,17 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
   }
 
   Future<void> _restoreSession() async {
-    final email = await FirebaseService.restoreSession();
+    // The actual session check is often near-instant, which made the
+    // branded loading screen flash by too fast to register as a brand
+    // moment. Running it alongside a fixed minimum delay (via Future.wait)
+    // means the splash always shows for at least this long, however fast
+    // the network call itself finishes — without ever waiting longer than
+    // necessary when the check happens to be slow.
+    final results = await Future.wait([
+      FirebaseService.restoreSession(),
+      Future.delayed(const Duration(milliseconds: 1100)),
+    ]);
+    final email = results[0] as String?;
     if (mounted) {
       setState(() {
         _userEmail = email;
@@ -183,11 +193,20 @@ String _categoryLabelForKey(String key) => switch (key) {
       _ => HomeStrings.catTrips,
     };
 
-void _launchWhatsAppMessage(String offerTitle) {
+/// Opens WhatsApp to the offer's own company number so the visitor talks
+/// to the company directly. Falls back to the platform's number only when
+/// the company has no WhatsApp number registered. Every tap is also
+/// counted on the offer (see FirebaseService.recordWhatsappClick).
+void _launchWhatsAppMessage(String offerTitle, {String? companyWhatsapp, String? offerId}) {
+  final companyDigits = (companyWhatsapp ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+  final number = companyDigits.isNotEmpty ? companyDigits : _kWhatsappNumber;
+  if (offerId != null && offerId.isNotEmpty) {
+    FirebaseService.recordWhatsappClick(offerId);
+  }
   final message = HomeStrings.isRtl
       ? 'أهلاً، أنا مهتم بـ: $offerTitle - SWA Travel'
       : 'Hi, I\'m interested in: $offerTitle - SWA Travel';
-  final uri = Uri.parse('https://wa.me/$_kWhatsappNumber?text=${Uri.encodeComponent(message)}');
+  final uri = Uri.parse('https://wa.me/$number?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
 }
 
@@ -212,6 +231,35 @@ void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr) {
       'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا. شكرًا لتعاونكم - فريق SWA Travel';
   final uri = Uri.parse('https://wa.me/$companyWhatsapp?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
+}
+
+/// Small "views" indicator shown on an offer card. Below
+/// HomeStrings.viewsBadgeThreshold views it shows a "New" badge instead
+/// of the raw number, so a fresh offer never looks empty; from the
+/// threshold on, the real number appears automatically.
+Widget _buildViewsIndicator(int views) {
+  final showNumber = HomeStrings.showViewsNumber(views);
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: showNumber
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.visibility_outlined, size: 12, color: Colors.white.withOpacity(0.6)),
+              const SizedBox(width: 4),
+              Text(HomeStrings.viewsCount(views), style: TextStyle(fontSize: 10.5, color: Colors.white.withOpacity(0.6))),
+            ],
+          )
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: SwaColors.gold.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: SwaColors.gold.withOpacity(0.5), width: 1),
+            ),
+            child: Text(HomeStrings.newBadge, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: SwaColors.gold)),
+          ),
+  );
 }
 
 /// Renders one offer card. `o` may come from the hardcoded demo list
@@ -274,6 +322,7 @@ Widget _buildOfferCardWidget(Map<String, dynamic> o) {
               const SizedBox(height: 2),
               Text(o['sub'] as String, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
               const SizedBox(height: 6),
+              if (o['views'] is int) _buildViewsIndicator(o['views'] as int),
               if (rating != null)
                 Row(
                   children: [
@@ -306,7 +355,11 @@ Widget _buildOfferCardWidget(Map<String, dynamic> o) {
             Text(o['price'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SwaColors.gold)),
             const SizedBox(height: 8),
             InkWell(
-              onTap: () => _launchWhatsAppMessage(o['title'] as String),
+              onTap: () => _launchWhatsAppMessage(
+                o['title'] as String,
+                companyWhatsapp: o['companyWhatsapp'] as String?,
+                offerId: o['id'] as String?,
+              ),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -374,6 +427,21 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
         _loading = false;
       });
     }
+    // Count a view for every offer being shown to this visitor — same
+    // active/non-expired filter as build(). The admin's own visits are
+    // skipped so managing the site doesn't inflate the numbers.
+    if (!_isAdmin) {
+      final now = DateTime.now();
+      for (final o in offers) {
+        final expiresAt = o['expiresAt'];
+        final parsed = (expiresAt == null || expiresAt.isEmpty) ? null : DateTime.tryParse(expiresAt);
+        final isActive = parsed == null || parsed.isAfter(now);
+        final id = o['id'];
+        if (isActive && id != null && id.isNotEmpty) {
+          FirebaseService.recordOfferView(id);
+        }
+      }
+    }
   }
 
   @override
@@ -399,6 +467,9 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
           'featured': false,
           'imageFile': o['imageFile'],
           'pdfFile': o['pdfFile'],
+          'id': o['id'],
+          'companyWhatsapp': o['company_whatsapp'],
+          'views': int.tryParse(o['views'] ?? '') ?? 0,
         }).toList();
 
     return Padding(
@@ -601,6 +672,9 @@ class _CategoriesSectionState extends State<_CategoriesSection> {
                                     'featured': false,
                                     'imageFile': o['imageFile'],
                                     'pdfFile': o['pdfFile'],
+                                    'id': o['id'],
+                                    'companyWhatsapp': o['company_whatsapp'],
+                                    'views': int.tryParse(o['views'] ?? '') ?? 0,
                                   };
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 10),

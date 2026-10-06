@@ -480,4 +480,22 @@ class HomeStrings {
         AppLanguage.en => 'Add the company\'s WhatsApp number first to send a reminder',
         AppLanguage.de => 'Fügen Sie zuerst die WhatsApp-Nummer des Unternehmens hinzu, um eine Erinnerung zu senden',
       };
+
+  // ---------- Views counter + "New" badge ----------
+  // Below this many views, the public UI shows the "New" badge instead of
+  // the raw number, so a fresh offer never looks "dead".
+  static const int viewsBadgeThreshold = 5;
+
+  static bool showViewsNumber(int views) => views >= viewsBadgeThreshold;
+
+  static String get newBadge => switch (current) {
+        AppLanguage.ar => 'جديد',
+        AppLanguage.en => 'New',
+        AppLanguage.de => 'Neu',
+      };
+  static String viewsCount(int n) => switch (current) {
+        AppLanguage.ar => '$n مشاهدة',
+        AppLanguage.en => '$n views',
+        AppLanguage.de => '$n Aufrufe',
+      };
 }

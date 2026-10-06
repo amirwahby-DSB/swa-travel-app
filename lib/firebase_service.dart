@@ -334,6 +334,52 @@ class FirebaseService {
     }
   }
 
+  /// Adds 1 to a numeric counter field ('views' or 'whatsapp_clicks') on an
+  /// offer using Firestore's atomic `increment` transform, so two visitors
+  /// hitting it at the same moment never overwrite each other's count.
+  /// Public (no auth header) — the Firestore security rules must allow
+  /// this specific update. Best-effort: any failure is swallowed so a
+  /// counter problem can never break the page for a visitor.
+  static Future<void> _incrementOfferField(String id, String field) async {
+    try {
+      final body = {
+        'writes': [
+          {
+            'transform': {
+              'document': 'projects/$_projectId/databases/(default)/documents/offers/$id',
+              'fieldTransforms': [
+                {
+                  'fieldPath': field,
+                  'increment': {'integerValue': '1'},
+                },
+              ],
+            },
+            'currentDocument': {'exists': true},
+          },
+        ],
+      };
+      await http.post(
+        Uri.parse('$_firestoreBase:commit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+    } catch (_) {
+      // Ignore — see doc comment above.
+    }
+  }
+
+  /// Counts one view of an offer every time it is shown to a visitor
+  /// (like a standard "page views" number — every open or refresh of the
+  /// page counts).
+  static Future<void> recordOfferView(String id) async {
+    await _incrementOfferField(id, 'views');
+  }
+
+  /// Counts one tap on an offer's WhatsApp button.
+  static Future<void> recordWhatsappClick(String id) {
+    return _incrementOfferField(id, 'whatsapp_clicks');
+  }
+
   /// Runs all 6 translations (title/description/price × en/de) in
   /// parallel so a save only takes as long as the single slowest
   /// translation call, not all of them added up sequentially.
@@ -389,7 +435,9 @@ class FirebaseService {
   /// Fetches all documents in the `offers` collection. Returns a plain
   /// list of maps with 'id', 'title_ar'/'title_en'/'title_de' (and the
   /// same for 'description' and 'price'), 'category_key', 'imageFile'
-  /// and 'pdfFile'. Offers saved before the translation system existed
+  /// 'pdfFile', 'company_whatsapp', 'expiresAt', 'views' and
+  /// 'whatsapp_clicks' (both as numeric strings, '0' when never counted).
+  /// Offers saved before the translation system existed
   /// (which only had single 'title'/'description'/'price'/'category'
   /// fields) are transparently upgraded here: the same original text is
   /// used for all three languages, and the old category label is mapped
@@ -475,6 +523,8 @@ class FirebaseService {
           'pdfFile': field('pdfFile'),
           'company_whatsapp': field('company_whatsapp'),
           'expiresAt': expiresAtRaw,
+          'views': (fields['views']?['integerValue'] as String?) ?? '0',
+          'whatsapp_clicks': (fields['whatsapp_clicks']?['integerValue'] as String?) ?? '0',
         };
       }).toList();
       return offers;
