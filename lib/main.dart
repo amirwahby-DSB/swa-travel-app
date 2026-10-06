@@ -54,7 +54,7 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
     // necessary when the check happens to be slow.
     final results = await Future.wait([
       FirebaseService.restoreSession(),
-      Future.delayed(const Duration(milliseconds: 1100)),
+      Future.delayed(const Duration(milliseconds: 2000)),
     ]);
     final email = results[0] as String?;
     if (mounted) {

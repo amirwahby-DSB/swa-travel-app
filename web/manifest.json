@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0B2545",
     "theme_color": "#0B2545",
-    "description": "All your travel offers in one place.",
+    "description": "All your travel offers in one place",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
