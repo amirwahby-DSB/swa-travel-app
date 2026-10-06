@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'firebase_service.dart';
@@ -388,6 +390,170 @@ Widget _buildOfferCardWidget(Map<String, dynamic> o) {
   );
 }
 
+/// Auto-advancing image banner shown above the offers list. Each slide is
+/// an offer that has a picture; tapping a slide opens WhatsApp to that
+/// offer's company. Advances every 4 seconds, can be swiped (or dragged
+/// with the mouse), and the dots below show/jump to the current slide.
+class _OffersSlider extends StatefulWidget {
+  final List<Map<String, dynamic>> slides;
+  final bool isWide;
+  const _OffersSlider({Key? key, required this.slides, required this.isWide}) : super(key: key);
+
+  @override
+  State<_OffersSlider> createState() => _OffersSliderState();
+}
+
+class _OffersSliderState extends State<_OffersSlider> {
+  final PageController _controller = PageController();
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoPlay();
+  }
+
+  void _startAutoPlay() {
+    _timer?.cancel();
+    if (widget.slides.length < 2) return;
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_controller.hasClients) return;
+      final next = (_index + 1) % widget.slides.length;
+      _controller.animateToPage(next, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _buildSlide(Map<String, dynamic> o) {
+    final title = (o['title'] as String?) ?? '';
+    final price = (o['price'] as String?) ?? '';
+    final imageFile = (o['imageFile'] as String?) ?? '';
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _launchWhatsAppMessage(
+          title,
+          companyWhatsapp: o['companyWhatsapp'] as String?,
+          offerId: o['id'] as String?,
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(colors: [SwaColors.inkDeep, SwaColors.ink]),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                'offer_images/$imageFile',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.local_offer_outlined, color: SwaColors.gold, size: 36),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, SwaColors.inkDeep.withOpacity(0.88)],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      if (price.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Text(price, style: const TextStyle(color: SwaColors.gold, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slides = widget.slides;
+    return Column(
+      children: [
+        AspectRatio(
+          aspectRatio: widget.isWide ? 21 / 9 : 16 / 9,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: SwaColors.gold.withOpacity(0.45), width: 1),
+              boxShadow: [BoxShadow(color: SwaColors.gold.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 8))],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse},
+                ),
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: slides.length,
+                  onPageChanged: (i) {
+                    setState(() => _index = i);
+                    _startAutoPlay();
+                  },
+                  itemBuilder: (_, i) => _buildSlide(slides[i]),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (slides.length > 1) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(slides.length, (i) {
+              final active = i == _index;
+              return GestureDetector(
+                onTap: () => _controller.animateToPage(i, duration: const Duration(milliseconds: 350), curve: Curves.easeInOut),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: active ? SwaColors.gold : SwaColors.textMuted.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// Featured offers, now backed by Firestore: the 4 demo listings always
 /// show first (so the page never looks empty), followed by any real
 /// offers an admin has added via the Manage Offers panel. Only the
@@ -472,11 +638,18 @@ class _FeaturedOffersSectionState extends State<_FeaturedOffersSection> {
           'views': int.tryParse(o['views'] ?? '') ?? 0,
         }).toList();
 
+    // Offers that have a picture feed the image banner above the list.
+    final slides = offers.where((o) => ((o['imageFile'] as String?) ?? '').isNotEmpty).toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 30, 22, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!_loading && slides.isNotEmpty) ...[
+            _OffersSlider(key: ValueKey(slides.map((o) => o['id']).join(',')), slides: slides, isWide: widget.isWide),
+            const SizedBox(height: 26),
+          ],
           Row(
             children: [
               Container(width: 18, height: 1.4, color: SwaColors.gold),
