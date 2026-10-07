@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "swatravel",
     "public": "build/web",
     "ignore": [
       "firebase.json",
