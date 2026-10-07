@@ -498,4 +498,9 @@ class HomeStrings {
         AppLanguage.en => '$n views',
         AppLanguage.de => '$n Aufrufe',
       };
+  static String whatsappClicksCount(int n) => switch (current) {
+        AppLanguage.ar => '$n ضغطة واتساب',
+        AppLanguage.en => '$n WhatsApp clicks',
+        AppLanguage.de => '$n WhatsApp-Klicks',
+      };
 }

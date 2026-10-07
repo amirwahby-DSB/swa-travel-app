@@ -195,12 +195,26 @@ String _categoryLabelForKey(String key) => switch (key) {
       _ => HomeStrings.catTrips,
     };
 
+/// Turns a WhatsApp number as typed by an admin into the international
+/// digits wa.me needs: country code first, no "+", spaces or leading zero.
+/// Egyptian local numbers such as 01229899614 become 201229899614; numbers
+/// that already start with 00 or a country code are kept as they are.
+String _normalizeWhatsappNumber(String raw) {
+  var digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.startsWith('00')) {
+    digits = digits.substring(2);
+  } else if (digits.startsWith('0')) {
+    digits = '20${digits.substring(1)}';
+  }
+  return digits;
+}
+
 /// Opens WhatsApp to the offer's own company number so the visitor talks
 /// to the company directly. Falls back to the platform's number only when
 /// the company has no WhatsApp number registered. Every tap is also
 /// counted on the offer (see FirebaseService.recordWhatsappClick).
 void _launchWhatsAppMessage(String offerTitle, {String? companyWhatsapp, String? offerId}) {
-  final companyDigits = (companyWhatsapp ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+  final companyDigits = _normalizeWhatsappNumber(companyWhatsapp ?? '');
   final number = companyDigits.isNotEmpty ? companyDigits : _kWhatsappNumber;
   if (offerId != null && offerId.isNotEmpty) {
     FirebaseService.recordWhatsappClick(offerId);
@@ -231,7 +245,7 @@ int? _daysRemaining(String? expiresAtRaw) {
 void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr) {
   final message = 'مرحبًا، عرضكم "$offerTitleAr" على منصة SWA Travel قارب على الانتهاء أو انتهى بالفعل. '
       'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا. شكرًا لتعاونكم - فريق SWA Travel';
-  final uri = Uri.parse('https://wa.me/$companyWhatsapp?text=${Uri.encodeComponent(message)}');
+  final uri = Uri.parse('https://wa.me/${_normalizeWhatsappNumber(companyWhatsapp)}?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
 }
 
@@ -2051,6 +2065,24 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
                                           padding: EdgeInsets.all(6),
                                           child: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
                                         ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.visibility_outlined, size: 13, color: SwaColors.textMuted),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        HomeStrings.viewsCount(int.tryParse(offer['views'] ?? '') ?? 0),
+                                        style: const TextStyle(fontSize: 10.5, color: SwaColors.textMuted),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      const Icon(Icons.chat_outlined, size: 13, color: Color(0xFF25D366)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        HomeStrings.whatsappClicksCount(int.tryParse(offer['whatsapp_clicks'] ?? '') ?? 0),
+                                        style: const TextStyle(fontSize: 10.5, color: SwaColors.textMuted),
                                       ),
                                     ],
                                   ),
