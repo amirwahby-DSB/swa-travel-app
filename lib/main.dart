@@ -253,10 +253,10 @@ int? _daysRemaining(String? expiresAtRaw) {
 /// from the manage-offers panel takes one tap instead of typing anything.
 void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr, {String? offerId}) {
   final lines = <String>[
-    'أهلاً بحضرتكم 👋',
+    'أهلاً بحضرتكم،',
     'معاكم فريق SWA Travel.',
     '',
-    'عرضكم "$offerTitleAr" على المنصة قارب على الانتهاء أو انتهى بالفعل.',
+    'عرضكم "${offerTitleAr.trim()}" على المنصة قارب على الانتهاء أو انتهى بالفعل.',
   ];
   // Let the company see its own results while it decides about renewing.
   if (offerId != null && offerId.isNotEmpty) {
@@ -273,7 +273,7 @@ void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr, {String
     'ولأي اقتراح أو ملاحظة تواصلوا معنا هنا:',
     'https://wa.me/$_kWhatsappNumber',
     '',
-    'شكرًا لتعاونكم 🌟',
+    'شكرًا لتعاونكم.',
   ]);
   final message = lines.join('\n');
   final uri = Uri.parse('https://wa.me/${_normalizeWhatsappNumber(companyWhatsapp)}?text=${Uri.encodeComponent(message)}');
