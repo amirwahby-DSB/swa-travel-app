@@ -48,6 +48,14 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
   @override
   void initState() {
     super.initState();
+    // Links sent to companies carry &lang=en / &lang=de so the page opens in
+    // the language the message was written in (default is Arabic).
+    final lang = Uri.base.queryParameters['lang'];
+    if (lang == 'en') {
+      HomeStrings.current = AppLanguage.en;
+    } else if (lang == 'de') {
+      HomeStrings.current = AppLanguage.de;
+    }
     _restoreSession();
   }
 
@@ -106,7 +114,7 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
         child: _statsId.isNotEmpty
-            ? _CompanyStatsPage(offerId: _statsId)
+            ? _CompanyStatsPage(offerId: _statsId, onLanguageChange: _setLanguage)
             : _restoringSession
             ? Scaffold(
                 backgroundColor: SwaColors.ink,
@@ -251,30 +259,55 @@ int? _daysRemaining(String? expiresAtRaw) {
 /// Opens WhatsApp to the offer's company number (NOT the platform's own
 /// WhatsApp number) with a ready-to-send renewal reminder, so sending one
 /// from the manage-offers panel takes one tap instead of typing anything.
-void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr, {String? offerId}) {
-  final lines = <String>[
-    'أهلاً بحضرتكم،',
-    'معاكم فريق SWA Travel.',
-    '',
-    'عرضكم "${offerTitleAr.trim()}" على المنصة قارب على الانتهاء أو انتهى بالفعل.',
-  ];
-  // Let the company see its own results while it decides about renewing.
-  if (offerId != null && offerId.isNotEmpty) {
-    lines.addAll([
-      '',
-      'تقدروا تتابعوا نتيجة عرضكم (المشاهدات وضغطات واتساب) من هنا:',
-      '$_kSiteUrl/?stats=$offerId',
-    ]);
-  }
-  lines.addAll([
-    '',
-    'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا.',
-    '',
-    'ولأي اقتراح أو ملاحظة تواصلوا معنا هنا:',
-    'https://wa.me/$_kWhatsappNumber',
-    '',
-    'شكرًا لتعاونكم.',
-  ]);
+void _launchRenewalReminder(String companyWhatsapp, String offerTitle, {String? offerId}) {
+  final title = offerTitle.trim();
+  final hasLink = offerId != null && offerId.isNotEmpty;
+  final link = hasLink ? '$_kSiteUrl/?stats=$offerId&lang=${_langSuffix()}' : '';
+  final contact = 'https://wa.me/$_kWhatsappNumber';
+  final List<String> lines = switch (HomeStrings.current) {
+    AppLanguage.ar => [
+        'أهلاً بحضرتكم،',
+        'معاكم فريق SWA Travel.',
+        '',
+        'عرضكم "$title" على المنصة قارب على الانتهاء أو انتهى بالفعل.',
+        if (hasLink) ...['', 'تقدروا تتابعوا نتيجة عرضكم (المشاهدات وضغطات واتساب) من هنا:', link],
+        '',
+        'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا.',
+        '',
+        'ولأي اقتراح أو ملاحظة تواصلوا معنا هنا:',
+        contact,
+        '',
+        'شكرًا لتعاونكم.',
+      ],
+    AppLanguage.en => [
+        'Hello,',
+        'This is the SWA Travel team.',
+        '',
+        'Your offer "$title" on the platform is about to expire or has already expired.',
+        if (hasLink) ...['', "You can follow your offer's results (views and WhatsApp clicks) here:", link],
+        '',
+        'If you would like to renew the subscription, please pay the monthly subscription fee and send the payment receipt here.',
+        '',
+        'For any suggestion or comment, contact us here:',
+        contact,
+        '',
+        'Thank you for your cooperation.',
+      ],
+    AppLanguage.de => [
+        'Hallo,',
+        'hier ist das Team von SWA Travel.',
+        '',
+        'Ihr Angebot "$title" auf der Plattform läuft in Kürze ab oder ist bereits abgelaufen.',
+        if (hasLink) ...['', 'Die Ergebnisse Ihres Angebots (Aufrufe und WhatsApp-Klicks) können Sie hier verfolgen:', link],
+        '',
+        'Wenn Sie das Abonnement verlängern möchten, überweisen Sie bitte den monatlichen Abonnementbetrag und senden Sie uns den Zahlungsbeleg hier.',
+        '',
+        'Für Anregungen oder Feedback erreichen Sie uns hier:',
+        contact,
+        '',
+        'Vielen Dank für Ihre Zusammenarbeit.',
+      ],
+  };
   final message = lines.join('\n');
   final uri = Uri.parse('https://wa.me/${_normalizeWhatsappNumber(companyWhatsapp)}?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
@@ -283,9 +316,11 @@ void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr, {String
 /// Opens WhatsApp to the platform's own number so a partner company can
 /// send a suggestion or comment about its offer.
 void _launchPlatformContact(String offerTitle) {
-  final message = HomeStrings.isRtl
-      ? 'أهلاً، عندي اقتراح أو ملاحظة بخصوص عرض "$offerTitle" على SWA Travel'
-      : 'Hi, I have a suggestion or comment about my offer "$offerTitle" on SWA Travel';
+  final message = switch (HomeStrings.current) {
+    AppLanguage.ar => 'أهلاً، عندي اقتراح أو ملاحظة بخصوص عرض "$offerTitle" على SWA Travel',
+    AppLanguage.en => 'Hi, I have a suggestion or comment about my offer "$offerTitle" on SWA Travel',
+    AppLanguage.de => 'Hallo, ich habe eine Anregung oder einen Kommentar zu meinem Angebot "$offerTitle" auf SWA Travel',
+  };
   final uri = Uri.parse('https://wa.me/$_kWhatsappNumber?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
 }
@@ -1875,7 +1910,8 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
 /// login, no editing, no navigation to the rest of the site.
 class _CompanyStatsPage extends StatefulWidget {
   final String offerId;
-  const _CompanyStatsPage({required this.offerId});
+  final void Function(AppLanguage) onLanguageChange;
+  const _CompanyStatsPage({required this.offerId, required this.onLanguageChange});
 
   @override
   State<_CompanyStatsPage> createState() => _CompanyStatsPageState();
@@ -1920,6 +1956,25 @@ class _CompanyStatsPageState extends State<_CompanyStatsPage> {
             ? o['title_de']
             : o['title_ar'];
     return (picked == null || picked.isEmpty) ? (o['title_ar'] ?? '') : picked;
+  }
+
+  Widget _langButton(AppLanguage lang, String label) {
+    final active = HomeStrings.current == lang;
+    return InkWell(
+      onTap: () => widget.onLanguageChange(lang),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+            color: active ? SwaColors.gold : Colors.white.withOpacity(0.55),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _statCard(IconData icon, Color iconColor, String value, String label) {
@@ -2043,7 +2098,16 @@ class _CompanyStatsPageState extends State<_CompanyStatsPage> {
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _langButton(AppLanguage.ar, 'العربية'),
+                    _langButton(AppLanguage.en, 'English'),
+                    _langButton(AppLanguage.de, 'Deutsch'),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 body,
               ],
             ),
@@ -2111,7 +2175,7 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
   void _copyStatsLink(Map<String, String> offer) {
     final id = offer['id'] ?? '';
     if (id.isEmpty) return;
-    html.window.navigator.clipboard?.writeText('$_kSiteUrl/?stats=$id');
+    html.window.navigator.clipboard?.writeText('$_kSiteUrl/?stats=$id&lang=${_langSuffix()}');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(HomeStrings.statsLinkCopied), duration: const Duration(seconds: 2)),
     );
@@ -2125,7 +2189,8 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
       );
       return;
     }
-    _launchRenewalReminder(whatsapp, offer['title_ar'] ?? '', offerId: offer['id']);
+    final localTitle = _pickByLanguage(offer, 'title');
+    _launchRenewalReminder(whatsapp, localTitle.isEmpty ? (offer['title_ar'] ?? '') : localTitle, offerId: offer['id']);
   }
 
   Future<void> _confirmDelete(Map<String, String> offer) async {
