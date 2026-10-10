@@ -529,6 +529,11 @@ class HomeStrings {
         AppLanguage.en => 'Copy partner link',
         AppLanguage.de => 'Partner-Link kopieren',
       };
+  static String get statsContactButton => switch (current) {
+        AppLanguage.ar => 'لأي اقتراح أو ملاحظة تواصل معنا',
+        AppLanguage.en => 'Any suggestion or comment? Contact us',
+        AppLanguage.de => 'Anregungen oder Feedback? Kontaktieren Sie uns',
+      };
   static String get statsLinkCopied => switch (current) {
         AppLanguage.ar => 'تم نسخ رابط الإحصائيات',
         AppLanguage.en => 'Statistics link copied',

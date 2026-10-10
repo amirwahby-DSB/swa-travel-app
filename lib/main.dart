@@ -201,6 +201,9 @@ String _categoryLabelForKey(String key) => switch (key) {
       _ => HomeStrings.catTrips,
     };
 
+/// The public address of the site, used in links sent to companies.
+const String _kSiteUrl = 'https://swatravel.web.app';
+
 /// Turns a WhatsApp number as typed by an admin into the international
 /// digits wa.me needs: country code first, no "+", spaces or leading zero.
 /// Egyptian local numbers such as 01229899614 become 201229899614; numbers
@@ -248,10 +251,42 @@ int? _daysRemaining(String? expiresAtRaw) {
 /// Opens WhatsApp to the offer's company number (NOT the platform's own
 /// WhatsApp number) with a ready-to-send renewal reminder, so sending one
 /// from the manage-offers panel takes one tap instead of typing anything.
-void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr) {
-  final message = 'مرحبًا، عرضكم "$offerTitleAr" على منصة SWA Travel قارب على الانتهاء أو انتهى بالفعل. '
-      'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا. شكرًا لتعاونكم - فريق SWA Travel';
+void _launchRenewalReminder(String companyWhatsapp, String offerTitleAr, {String? offerId}) {
+  final lines = <String>[
+    'أهلاً بحضرتكم 👋',
+    'معاكم فريق SWA Travel.',
+    '',
+    'عرضكم "$offerTitleAr" على المنصة قارب على الانتهاء أو انتهى بالفعل.',
+  ];
+  // Let the company see its own results while it decides about renewing.
+  if (offerId != null && offerId.isNotEmpty) {
+    lines.addAll([
+      '',
+      'تقدروا تتابعوا نتيجة عرضكم (المشاهدات وضغطات واتساب) من هنا:',
+      '$_kSiteUrl/?stats=$offerId',
+    ]);
+  }
+  lines.addAll([
+    '',
+    'لو حابين تجددوا الاشتراك، برجاء تسديد قيمة الاشتراك الشهري وإرسال صورة الإيصال هنا.',
+    '',
+    'ولأي اقتراح أو ملاحظة تواصلوا معنا هنا:',
+    'https://wa.me/$_kWhatsappNumber',
+    '',
+    'شكرًا لتعاونكم 🌟',
+  ]);
+  final message = lines.join('\n');
   final uri = Uri.parse('https://wa.me/${_normalizeWhatsappNumber(companyWhatsapp)}?text=${Uri.encodeComponent(message)}');
+  html.window.open(uri.toString(), '_blank');
+}
+
+/// Opens WhatsApp to the platform's own number so a partner company can
+/// send a suggestion or comment about its offer.
+void _launchPlatformContact(String offerTitle) {
+  final message = HomeStrings.isRtl
+      ? 'أهلاً، عندي اقتراح أو ملاحظة بخصوص عرض "$offerTitle" على SWA Travel'
+      : 'Hi, I have a suggestion or comment about my offer "$offerTitle" on SWA Travel';
+  final uri = Uri.parse('https://wa.me/$_kWhatsappNumber?text=${Uri.encodeComponent(message)}');
   html.window.open(uri.toString(), '_blank');
 }
 
@@ -1974,6 +2009,20 @@ class _CompanyStatsPageState extends State<_CompanyStatsPage> {
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
           ),
+          const SizedBox(height: 22),
+          OutlinedButton.icon(
+            onPressed: () => _launchPlatformContact(_title(o)),
+            icon: const Icon(Icons.chat_outlined, size: 18, color: Color(0xFF25D366)),
+            label: Text(
+              HomeStrings.statsContactButton,
+              style: const TextStyle(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: const Color(0xFF25D366).withOpacity(0.7), width: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+            ),
+          ),
         ],
       );
     }
@@ -2062,7 +2111,7 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
   void _copyStatsLink(Map<String, String> offer) {
     final id = offer['id'] ?? '';
     if (id.isEmpty) return;
-    html.window.navigator.clipboard?.writeText('${Uri.base.origin}/?stats=$id');
+    html.window.navigator.clipboard?.writeText('$_kSiteUrl/?stats=$id');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(HomeStrings.statsLinkCopied), duration: const Duration(seconds: 2)),
     );
@@ -2076,7 +2125,7 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
       );
       return;
     }
-    _launchRenewalReminder(whatsapp, offer['title_ar'] ?? '');
+    _launchRenewalReminder(whatsapp, offer['title_ar'] ?? '', offerId: offer['id']);
   }
 
   Future<void> _confirmDelete(Map<String, String> offer) async {
