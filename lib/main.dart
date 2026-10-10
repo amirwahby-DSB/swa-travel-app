@@ -41,6 +41,10 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
   // for a split second before the restored session is applied.
   bool _restoringSession = true;
 
+  // A partner company's private link looks like  /?stats=<offerId>.  When
+  // present, the app shows only that offer's numbers (no login, no site).
+  String get _statsId => Uri.base.queryParameters['stats'] ?? '';
+
   @override
   void initState() {
     super.initState();
@@ -101,7 +105,9 @@ class _SwaTravelAppState extends State<SwaTravelApp> {
       ),
       home: Directionality(
         textDirection: HomeStrings.isRtl ? TextDirection.rtl : TextDirection.ltr,
-        child: _restoringSession
+        child: _statsId.isNotEmpty
+            ? _CompanyStatsPage(offerId: _statsId)
+            : _restoringSession
             ? Scaffold(
                 backgroundColor: SwaColors.ink,
                 body: Center(
@@ -1829,6 +1835,176 @@ class _AddOfferDialogState extends State<_AddOfferDialog> {
 // edit/delete actions, plus a button to add a new one. This is what the
 // "إدارة العروض" entry point opens now, instead of jumping straight to
 // the add-offer form. ----------
+/// Read-only page a partner company opens from its private link
+/// (/?stats=<offerId>). It shows only that one offer's numbers — no
+/// login, no editing, no navigation to the rest of the site.
+class _CompanyStatsPage extends StatefulWidget {
+  final String offerId;
+  const _CompanyStatsPage({required this.offerId});
+
+  @override
+  State<_CompanyStatsPage> createState() => _CompanyStatsPageState();
+}
+
+class _CompanyStatsPageState extends State<_CompanyStatsPage> {
+  Map<String, String>? _offer;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    Map<String, String>? found;
+    try {
+      final offers = await FirebaseService.getOffers();
+      for (final o in offers) {
+        if (o['id'] == widget.offerId) {
+          found = o;
+          break;
+        }
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _offer = found;
+        _loading = false;
+      });
+    }
+  }
+
+  // Offers store one title per language; show the visitor's language and
+  // fall back to the Arabic title (always filled in by the admin).
+  String _title(Map<String, String> o) {
+    final lang = HomeStrings.current;
+    final picked = lang == AppLanguage.en
+        ? o['title_en']
+        : lang == AppLanguage.de
+            ? o['title_de']
+            : o['title_ar'];
+    return (picked == null || picked.isEmpty) ? (o['title_ar'] ?? '') : picked;
+  }
+
+  Widget _statCard(IconData icon, Color iconColor, String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SwaColors.inkLine, width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(height: 10),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(label, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const CircularProgressIndicator(strokeWidth: 2.4, color: SwaColors.gold);
+    } else if (_offer == null) {
+      body = Text(
+        HomeStrings.statsNotFound,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+      );
+    } else {
+      final o = _offer!;
+      final views = int.tryParse(o['views'] ?? '') ?? 0;
+      final clicks = int.tryParse(o['whatsapp_clicks'] ?? '') ?? 0;
+      final expiresAt = o['expiresAt'];
+      final parsed = (expiresAt == null || expiresAt.isEmpty) ? null : DateTime.tryParse(expiresAt);
+      String? daysText;
+      if (parsed != null) {
+        final days = parsed.difference(DateTime.now()).inDays;
+        daysText = days < 0 ? HomeStrings.expiredLabel : HomeStrings.daysRemainingText(days);
+      }
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            HomeStrings.statsPageTitle,
+            style: const TextStyle(color: SwaColors.gold, fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _title(o),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(child: _statCard(Icons.visibility_outlined, SwaColors.gold, '$views', HomeStrings.statsViewsLabel)),
+              const SizedBox(width: 12),
+              Expanded(child: _statCard(Icons.chat_outlined, const Color(0xFF25D366), '$clicks', HomeStrings.statsClicksLabel)),
+            ],
+          ),
+          if (daysText != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: SwaColors.inkLine, width: 1),
+              ),
+              child: Text(
+                daysText,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          Text(
+            HomeStrings.statsNote,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          ),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: SwaColors.ink,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/logo_primary.png',
+                  width: 150,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 28),
+                body,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ManageOffersDialog extends StatefulWidget {
   const _ManageOffersDialog();
 
@@ -1879,6 +2055,17 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
       // Best-effort UI feedback only — the list will simply show the
       // unchanged expiry if this fails, which is enough signal to retry.
     }
+  }
+
+  /// Copies the offer's private partner link (shows only that offer's
+  /// numbers, read-only) so the admin can send it to the company.
+  void _copyStatsLink(Map<String, String> offer) {
+    final id = offer['id'] ?? '';
+    if (id.isEmpty) return;
+    html.window.navigator.clipboard?.writeText('${Uri.base.origin}/?stats=$id');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(HomeStrings.statsLinkCopied), duration: const Duration(seconds: 2)),
+    );
   }
 
   void _sendReminder(Map<String, String> offer) {
@@ -2083,6 +2270,25 @@ class _ManageOffersDialogState extends State<_ManageOffersDialog> {
                                       Text(
                                         HomeStrings.whatsappClicksCount(int.tryParse(offer['whatsapp_clicks'] ?? '') ?? 0),
                                         style: const TextStyle(fontSize: 10.5, color: SwaColors.textMuted),
+                                      ),
+                                      const Spacer(),
+                                      InkWell(
+                                        onTap: () => _copyStatsLink(offer),
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.link, size: 13, color: SwaColors.gold),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                HomeStrings.copyStatsLink,
+                                                style: const TextStyle(fontSize: 10, color: SwaColors.gold, fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),

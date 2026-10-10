@@ -498,6 +498,42 @@ class HomeStrings {
         AppLanguage.en => '$n views',
         AppLanguage.de => '$n Aufrufe',
       };
+  // ---------- Partner stats page (private company link) ----------
+  static String get statsPageTitle => switch (current) {
+        AppLanguage.ar => 'إحصائيات عرضك',
+        AppLanguage.en => 'Your offer statistics',
+        AppLanguage.de => 'Statistiken Ihres Angebots',
+      };
+  static String get statsViewsLabel => switch (current) {
+        AppLanguage.ar => 'مشاهدات العرض',
+        AppLanguage.en => 'Offer views',
+        AppLanguage.de => 'Aufrufe des Angebots',
+      };
+  static String get statsClicksLabel => switch (current) {
+        AppLanguage.ar => 'ضغطات واتساب',
+        AppLanguage.en => 'WhatsApp clicks',
+        AppLanguage.de => 'WhatsApp-Klicks',
+      };
+  static String get statsNote => switch (current) {
+        AppLanguage.ar => 'الأرقام بتتحدّث تلقائيًا مع كل زيارة للموقع',
+        AppLanguage.en => 'Numbers update automatically with every visit to the site',
+        AppLanguage.de => 'Die Zahlen werden bei jedem Besuch der Seite automatisch aktualisiert',
+      };
+  static String get statsNotFound => switch (current) {
+        AppLanguage.ar => 'مفيش عرض مرتبط بالرابط ده. تأكد من الرابط اللي وصلك.',
+        AppLanguage.en => 'No offer is linked to this address. Please check the link you received.',
+        AppLanguage.de => 'Mit diesem Link ist kein Angebot verknüpft. Bitte prüfen Sie den erhaltenen Link.',
+      };
+  static String get copyStatsLink => switch (current) {
+        AppLanguage.ar => 'نسخ رابط الشركة',
+        AppLanguage.en => 'Copy partner link',
+        AppLanguage.de => 'Partner-Link kopieren',
+      };
+  static String get statsLinkCopied => switch (current) {
+        AppLanguage.ar => 'تم نسخ رابط الإحصائيات',
+        AppLanguage.en => 'Statistics link copied',
+        AppLanguage.de => 'Statistik-Link kopiert',
+      };
   static String whatsappClicksCount(int n) => switch (current) {
         AppLanguage.ar => '$n ضغطة واتساب',
         AppLanguage.en => '$n WhatsApp clicks',
